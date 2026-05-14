@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public read + write — no auth required (trip group share-link model)
+    // Tighten this to read-only for specific collections if needed.
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
