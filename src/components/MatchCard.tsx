@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { Matchup, Player, Round, AppConfig } from '../types';
+import type { Matchup, Player, Round, AppConfig, WagerType } from '../types';
 import { calcMatchResult } from '../lib/scoring';
 
 interface Props {
@@ -48,6 +48,13 @@ export default function MatchCard({
     ? `thru ${result.holesPlayed}`
     : result.isComplete && result.holesPlayed > 0 ? 'Final' : '';
 
+  const wagerLabels: Record<WagerType, string> = {
+    money: '$',
+    drinks: 'Drinks',
+    bragging_rights: 'Pride',
+    custom: 'Bet',
+  };
+
   function hdcpLine() {
     if (isFourball) {
       const { a1, a2, b1, b2 } = result.strokes;
@@ -69,11 +76,21 @@ export default function MatchCard({
     <div className="card hover:border-slate-600 transition-colors">
       {/* Format badge */}
       <div className="flex items-center gap-2 mb-2">
+        {matchup.teeTime && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 font-medium">
+            {formatTime(matchup.teeTime)}
+          </span>
+        )}
         <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
           isFourball ? 'bg-purple-900 text-purple-300' : 'bg-slate-700 text-slate-300'
         }`}>
           {isFourball ? 'Fourball' : 'Singles'}
         </span>
+        {matchup.manualResult && (
+          <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-950 text-yellow-300 font-medium">
+            Manual
+          </span>
+        )}
       </div>
 
       <div className="flex items-start justify-between gap-2">
@@ -103,6 +120,11 @@ export default function MatchCard({
             </span>
           </div>
           <span className="text-slate-500 text-xs mt-0.5">{hdcpLine()}</span>
+          {matchup.matchWager && (
+            <span className="text-yellow-300 text-xs mt-0.5">
+              Match wager: {wagerLabels[matchup.matchWager.type]} {matchup.matchWager.amount}
+            </span>
+          )}
         </div>
 
         {/* Status */}
@@ -129,4 +151,12 @@ export default function MatchCard({
 
   if (!showLink) return inner;
   return <Link to={`/match/${matchup.id}`}>{inner}</Link>;
+}
+
+function formatTime(time: string): string {
+  const [hoursRaw, minutes] = time.split(':').map(Number);
+  if (!Number.isFinite(hoursRaw) || !Number.isFinite(minutes)) return time;
+  const suffix = hoursRaw >= 12 ? 'PM' : 'AM';
+  const hours = hoursRaw % 12 || 12;
+  return `${hours}:${String(minutes).padStart(2, '0')} ${suffix}`;
 }

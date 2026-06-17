@@ -43,9 +43,77 @@ export function calcMatchResult(
   playerA2?: Player,
   playerB2?: Player
 ): MatchResult {
+  if (matchup.manualResult) {
+    const { pointsA, pointsB } = matchup.manualResult;
+    const winner = pointsA > pointsB ? 'A' : pointsB > pointsA ? 'B' : null;
+    const allocation = calcStrokeAllocation(matchup, playerA, playerB, strokeIndexes, playerA2, playerB2);
+    return {
+      holesPlayed: 18,
+      isComplete: true,
+      teamAHolesUp: pointsA > pointsB ? 1 : pointsB > pointsA ? -1 : 0,
+      status: winner === null ? 'Manual Halved' : 'Manual Result',
+      winner,
+      pointsA,
+      pointsB,
+      format: matchup.format,
+      strokes: allocation.strokes,
+      strokeHoles: allocation.strokeHoles,
+    };
+  }
+
   return matchup.format === 'fourball' && playerA2 && playerB2
     ? calcFourball(matchup, playerA, playerA2, playerB, playerB2, strokeIndexes)
     : calcSingles(matchup, playerA, playerB, strokeIndexes);
+}
+
+export function calcStrokeAllocation(
+  matchup: Matchup,
+  playerA: Player,
+  playerB: Player,
+  strokeIndexes: number[],
+  playerA2?: Player,
+  playerB2?: Player
+): Pick<MatchResult, 'strokes' | 'strokeHoles'> {
+  if (matchup.format === 'fourball' && playerA2 && playerB2) {
+    const rA1 = Math.round(playerA.handicap);
+    const rA2 = Math.round(playerA2.handicap);
+    const rB1 = Math.round(playerB.handicap);
+    const rB2 = Math.round(playerB2.handicap);
+    const minHcp = Math.min(rA1, rA2, rB1, rB2);
+    const strokes = {
+      a1: rA1 - minHcp,
+      a2: rA2 - minHcp,
+      b1: rB1 - minHcp,
+      b2: rB2 - minHcp,
+    };
+    return { strokes, strokeHoles: buildStrokeHoles(strokes, strokeIndexes) };
+  }
+
+  const rawDiff = Math.round(playerA.handicap) - Math.round(playerB.handicap);
+  const strokes = {
+    a1: rawDiff > 0 ? rawDiff : 0,
+    a2: 0,
+    b1: rawDiff < 0 ? -rawDiff : 0,
+    b2: 0,
+  };
+  return { strokes, strokeHoles: buildStrokeHoles(strokes, strokeIndexes) };
+}
+
+function buildStrokeHoles(
+  strokes: { a1: number; a2: number; b1: number; b2: number },
+  strokeIndexes: number[]
+): Record<number, { a1: number; a2: number; b1: number; b2: number }> {
+  const strokeHoles: Record<number, { a1: number; a2: number; b1: number; b2: number }> = {};
+  for (let h = 1; h <= 18; h++) {
+    const si = strokeIndexes[h - 1] ?? h;
+    strokeHoles[h] = {
+      a1: strokesOnHole(si, strokes.a1),
+      a2: strokesOnHole(si, strokes.a2),
+      b1: strokesOnHole(si, strokes.b1),
+      b2: strokesOnHole(si, strokes.b2),
+    };
+  }
+  return strokeHoles;
 }
 
 function calcSingles(
@@ -55,20 +123,7 @@ function calcSingles(
   strokeIndexes: number[]
 ): MatchResult {
   // USGA match play: round each handicap to nearest whole number before diffing
-  const rawDiff = Math.round(playerA.handicap) - Math.round(playerB.handicap);
-  const sA = rawDiff > 0 ? rawDiff : 0;
-  const sB = rawDiff < 0 ? -rawDiff : 0;
-
-  const strokeHoles: Record<number, { a1: number; a2: number; b1: number; b2: number }> = {};
-  for (let h = 1; h <= 18; h++) {
-    const si = strokeIndexes[h - 1] ?? h;
-    strokeHoles[h] = {
-      a1: sA > 0 ? strokesOnHole(si, sA) : 0,
-      a2: 0,
-      b1: sB > 0 ? strokesOnHole(si, sB) : 0,
-      b2: 0,
-    };
-  }
+  const { strokes, strokeHoles } = calcStrokeAllocation(matchup, playerA, playerB, strokeIndexes);
 
   let teamAHolesUp = 0;
   let lastHole = 0;
@@ -100,7 +155,7 @@ function calcSingles(
     pointsA,
     pointsB,
     format: 'singles',
-    strokes: { a1: sA, a2: 0, b1: sB, b2: 0 },
+    strokes,
     strokeHoles,
   };
 }
@@ -114,26 +169,7 @@ function calcFourball(
   strokeIndexes: number[]
 ): MatchResult {
   // USGA match play: round each handicap before computing differences
-  const rA1 = Math.round(a1.handicap);
-  const rA2 = Math.round(a2.handicap);
-  const rB1 = Math.round(b1.handicap);
-  const rB2 = Math.round(b2.handicap);
-  const minHcp = Math.min(rA1, rA2, rB1, rB2);
-  const dA1 = rA1 - minHcp;
-  const dA2 = rA2 - minHcp;
-  const dB1 = rB1 - minHcp;
-  const dB2 = rB2 - minHcp;
-
-  const strokeHoles: Record<number, { a1: number; a2: number; b1: number; b2: number }> = {};
-  for (let h = 1; h <= 18; h++) {
-    const si = strokeIndexes[h - 1] ?? h;
-    strokeHoles[h] = {
-      a1: strokesOnHole(si, dA1),
-      a2: strokesOnHole(si, dA2),
-      b1: strokesOnHole(si, dB1),
-      b2: strokesOnHole(si, dB2),
-    };
-  }
+  const { strokes, strokeHoles } = calcStrokeAllocation(matchup, a1, b1, strokeIndexes, a2, b2);
 
   let teamAHolesUp = 0;
   let lastHole = 0;
@@ -175,7 +211,7 @@ function calcFourball(
     pointsA,
     pointsB,
     format: 'fourball',
-    strokes: { a1: dA1, a2: dA2, b1: dB1, b2: dB2 },
+    strokes,
     strokeHoles,
   };
 }

@@ -38,6 +38,18 @@ cp .env.example .env
 Edit `.env` and fill in the Firebase config values from step 3.
 Set `VITE_ADMIN_PIN` to whatever PIN you want for admin access.
 
+### 4b. Enable player sign-in
+
+In Firebase Console:
+
+1. Go to **Build → Authentication**
+2. Click **Get started**
+3. Open **Sign-in method**
+4. Enable **Email/Password**
+
+Players can then use `/my-player` to create an account or sign in with the email assigned to them in Admin → Players.
+Admin can still override handicap and tees from Admin → Players.
+
 ### 5. Run locally
 
 ```bash
@@ -45,6 +57,13 @@ npm run dev
 ```
 
 Open `http://localhost:5173`
+
+### 6. Check before publishing
+
+```bash
+npm test
+npm run build
+```
 
 ---
 
@@ -78,16 +97,28 @@ Then in Cloudflare dashboard → Pages → mayday-golf → Settings → Custom D
 ### Admin setup (do this before the trip)
 
 1. Go to `/admin` → enter PIN
-2. **Setup tab**: set team names (e.g. USA / Europe)
-3. **Players tab**: add all 20 players with handicaps
-4. **Rounds tab**: add 3 rounds — enter course name + the stroke index for each hole (from the scorecard)
-5. **Matchups tab**: pair up Team A vs Team B players for each round
+2. **Trips tab**: add the trip, trip-specific team names, captains, and optional background
+3. **Players tab**: add all 20 players with handicaps, or import a CSV
+4. **Players tab**: assign Team A rivals from Team B for rivalry singles
+5. **Rounds tab**: add 3 rounds — enter course name + the stroke index for each hole (from the scorecard)
+6. **Matchups tab**: choose Singles or Fourball, then tap player pills to build matches
+7. **Matchups tab**: set the first tee time and apply 10-minute tee-time increments if needed
+
+Player CSV import accepts these headers:
+
+```csv
+name,email,team,handicap,teebox,rival
+player_a,player_a@example.com,A,12.4,White,player_b
+```
+
+Existing players are matched by email first, then name.
 
 ### During the round
 
 - Share the app URL with everyone
 - Each match shows on the scoreboard — tap it to open the scoring sheet
 - Enter gross scores hole by hole — match result updates live
+- If a group did not score live, open the match and use **Manual Result** to enter total strokes and assign 1 / .5 points
 - Tap **Finalize Match** when done
 
 ### Scoreboard
@@ -99,9 +130,14 @@ Then in Cloudflare dashboard → Pages → mayday-golf → Settings → Custom D
 
 ## Handicap math
 
-This uses standard match play handicap allocation:
+Singles uses standard match play handicap allocation:
 - `strokes = |handicap_A - handicap_B|`
 - The higher-handicap player receives strokes on the holes where the hole's stroke index ≤ strokes
 - For differences > 18, the player gets 2 strokes on the hardest holes
 
-Strokes are shown as colored dots (·) next to the stroke index on the scoring sheet.
+Fourball uses the lowest handicap in the match as the scratch anchor:
+- Each of the other 3 players receives the difference between their handicap and the lowest handicap
+- The team score for a hole is the lowest net score entered by either partner
+- A hole counts once at least one player on each team has a score entered
+
+Strokes are shown as colored dots next to the stroke index on the scoring sheet.
