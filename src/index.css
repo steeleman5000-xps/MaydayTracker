@@ -43,3 +43,28 @@
     @apply w-12 h-12 text-center text-xl font-bold bg-slate-700 border-2 border-slate-600 rounded-lg focus:outline-none focus:border-emerald-500 text-white;
   }
 }
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.35in;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  header,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .scorecard-print-shell {
+    color: #0f172a !important;
+  }
+}

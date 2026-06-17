@@ -5,19 +5,21 @@ import AdminPlayers from '../components/AdminPlayers';
 import AdminRounds from '../components/AdminRounds';
 import AdminMatchups from '../components/AdminMatchups';
 import AdminTrips from '../components/AdminTrips';
-import type { Player, Round, Matchup, AppConfig, Trip } from '../types';
+import AdminItinerary from '../components/AdminItinerary';
+import type { Player, Round, Matchup, AppConfig, Trip, TripEvent } from '../types';
 import {
   subscribeConfig,
   subscribePlayers,
   subscribeRounds,
   subscribeMatchups,
   subscribeTrips,
+  subscribeTripEvents,
   saveConfig,
 } from '../lib/db';
 import { tripBackgroundUrl } from '../lib/tripAssets';
 import { useTripSelection } from '../lib/tripSelection';
 
-type Tab = 'setup' | 'trips' | 'players' | 'rounds' | 'matchups';
+type Tab = 'setup' | 'trips' | 'players' | 'rounds' | 'matchups' | 'itinerary';
 
 export default function Admin() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -25,6 +27,7 @@ export default function Admin() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
+  const [events, setEvents] = useState<TripEvent[]>([]);
   const [tab, setTab] = useState<Tab>('setup');
   const [configForm, setConfigForm] = useState<AppConfig>({
     teamAName: 'USA',
@@ -44,6 +47,7 @@ export default function Admin() {
       subscribePlayers(setPlayers),
       subscribeRounds(setRounds),
       subscribeMatchups(setMatchups),
+      subscribeTripEvents(setEvents),
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
@@ -71,6 +75,7 @@ export default function Admin() {
   const activeTrip = selectedTrip ?? trips.find((trip) => trip.id === activeConfig.activeTripId);
   const selectedRoundIds = new Set(selectedRounds.map((round) => round.id));
   const selectedMatchups = matchups.filter((matchup) => selectedRoundIds.has(matchup.roundId));
+  const selectedEvents = events.filter((event) => event.tripId === selectedTripId);
   const tripConfig = {
     ...activeConfig,
     teamAName: activeTrip?.teamAName || activeConfig.teamAName,
@@ -83,6 +88,7 @@ export default function Admin() {
     { id: 'players', label: `Players (${players.length})` },
     { id: 'rounds', label: `Rounds (${selectedRounds.length})` },
     { id: 'matchups', label: `Matchups (${selectedMatchups.length})` },
+    { id: 'itinerary', label: `Itinerary (${selectedEvents.length})` },
   ];
 
   return (
@@ -185,6 +191,7 @@ export default function Admin() {
               <p>Trips: <span className="text-white">{trips.length}</span></p>
               <p>Rounds: <span className="text-white">{rounds.length}</span></p>
               <p>Matchups: <span className="text-white">{matchups.length}</span></p>
+              <p>Itinerary items: <span className="text-white">{selectedEvents.length}</span></p>
             </div>
 
             <div className="card text-sm text-slate-400 space-y-2">
@@ -195,6 +202,7 @@ export default function Admin() {
                 <li>Add all 20 players under <strong className="text-white">Players</strong></li>
                 <li>Add 3 rounds with course names + stroke indexes under <strong className="text-white">Rounds</strong></li>
                 <li>Create matchups (Team A vs Team B pairs) under <strong className="text-white">Matchups</strong></li>
+                <li>Add lodging, meals, notes, and tee logistics under <strong className="text-white">Itinerary</strong></li>
                 <li>Share the app URL — anyone can tap a match to enter scores live</li>
               </ol>
             </div>
@@ -215,6 +223,10 @@ export default function Admin() {
 
         {tab === 'matchups' && (
           <AdminMatchups rounds={selectedRounds} players={players} matchups={selectedMatchups} config={tripConfig} />
+        )}
+
+        {tab === 'itinerary' && (
+          <AdminItinerary tripId={selectedTripId} events={selectedEvents} />
         )}
       </Layout>
     </PinGate>

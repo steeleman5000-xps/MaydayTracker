@@ -148,6 +148,7 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
       teeGender: gender,
       courseRating: tee.course_rating,
       slopeRating: tee.slope_rating,
+      courseBrandColor: current.courseBrandColor || '#0f766e',
       pars: completeHoles.length ? completeHoles.map((hole) => hole.par) : undefined,
       yardages: completeHoles.length ? completeHoles.map((hole) => hole.yardage) : undefined,
       strokeIndexes: completeHoles.length ? completeHoles.map((hole) => hole.handicap) : current.strokeIndexes,
@@ -166,6 +167,8 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
       teeGender: round.teeGender,
       courseRating: round.courseRating,
       slopeRating: round.slopeRating,
+      courseLogoUrl: round.courseLogoUrl,
+      courseBrandColor: round.courseBrandColor,
       pars: round.pars ? [...round.pars] : undefined,
       yardages: round.yardages ? [...round.yardages] : undefined,
       strokeIndexes: [...round.strokeIndexes],
@@ -273,6 +276,27 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
                 placeholder="e.g. Example Golf Club"
                 value={form.courseName}
                 onChange={(e) => setForm({ ...form, courseName: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3">
+            <div>
+              <label className="label">Course Logo URL</label>
+              <input
+                className="input"
+                placeholder="https://course.com/logo.png"
+                value={form.courseLogoUrl ?? ''}
+                onChange={(e) => setForm({ ...form, courseLogoUrl: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">Brand Color</label>
+              <input
+                className="input h-11"
+                type="color"
+                value={form.courseBrandColor ?? '#0f766e'}
+                onChange={(e) => setForm({ ...form, courseBrandColor: e.target.value })}
               />
             </div>
           </div>
@@ -401,6 +425,25 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
                       value={[editState.courseRating, editState.slopeRating].filter((v) => v != null).join(' / ')}
                       disabled
                       placeholder="Imported only"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-3">
+                  <div>
+                    <label className="label">Course Logo URL</label>
+                    <input
+                      className="input"
+                      value={editState.courseLogoUrl ?? ''}
+                      onChange={(e) => setEditState({ ...editState, courseLogoUrl: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Brand Color</label>
+                    <input
+                      className="input h-11"
+                      type="color"
+                      value={editState.courseBrandColor ?? '#0f766e'}
+                      onChange={(e) => setEditState({ ...editState, courseBrandColor: e.target.value })}
                     />
                   </div>
                 </div>

@@ -22,5 +22,9 @@ service cloud.firestore {
     match /matchups/{matchupId} {
       allow read, write: if true;
     }
+
+    match /tripEvents/{eventId} {
+      allow read, write: if true;
+    }
   }
 }
