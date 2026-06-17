@@ -530,7 +530,7 @@ export default function MatchScoring() {
               Reopen Match
             </button>
           )}
-          <Link to="/" className="btn-secondary px-6">Back</Link>
+          <Link to="/scores" className="btn-secondary px-6">Back</Link>
         </div>
       </div>
 

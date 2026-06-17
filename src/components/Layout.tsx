@@ -25,19 +25,26 @@ export default function Layout({
 
   return (
     <div
-      className="min-h-screen bg-slate-900 flex flex-col relative"
-      style={backgroundUrl ? { backgroundImage: `url(${backgroundUrl})`, backgroundSize: 'cover', backgroundPosition: 'center top', backgroundAttachment: 'fixed' } : undefined}
+      className="min-h-screen bg-slate-950 flex flex-col relative"
     >
-      {backgroundUrl && <div className="fixed inset-0 bg-slate-950/78 pointer-events-none" />}
-      <header className="bg-slate-950/95 border-b border-slate-800 px-3 py-3 sticky top-0 z-10 backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
+      {backgroundUrl && (
+        <>
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-fixed opacity-20 pointer-events-none"
+            style={{ backgroundImage: `url(${backgroundUrl})` }}
+          />
+          <div className="fixed inset-0 bg-slate-950/84 pointer-events-none" />
+        </>
+      )}
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-3 py-2 text-slate-950 shadow-sm backdrop-blur">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-2 lg:grid-cols-[auto_1fr_auto]">
+          <div className="flex min-w-0 items-center gap-2 justify-between lg:justify-start">
             <Link to="/" className="flex items-center gap-2 shrink-0">
-              <img src={DEFAULT_LOGO_URL} alt="Mayday Golf Classic" className="h-9 w-auto" />
+              <img src={DEFAULT_LOGO_URL} alt="Mayday Golf Classic" className="h-11 w-auto" />
             </Link>
             {showTripSelector && (
               <select
-                className="h-9 w-[180px] max-w-[52vw] rounded-lg border border-slate-700 bg-slate-900 px-2 text-xs font-semibold text-white focus:border-emerald-500 focus:outline-none sm:w-64 sm:text-sm"
+                className="h-9 w-[180px] max-w-[52vw] rounded-lg border border-slate-300 bg-slate-50 px-2 text-xs font-semibold text-slate-900 focus:border-emerald-600 focus:outline-none sm:w-64 sm:text-sm"
                 value={selectedTripId}
                 onChange={(e) => onTripChange?.(e.target.value)}
                 aria-label="Selected trip"
@@ -50,13 +57,16 @@ export default function Layout({
               </select>
             )}
           </div>
-        <div className="flex gap-1 text-xs sm:text-sm overflow-x-auto">
+          <div className="hidden text-center font-black uppercase tracking-[0.22em] text-slate-900 sm:block">
+            Mayday Golf Championship
+          </div>
+        <div className="flex gap-1 overflow-x-auto text-xs sm:text-sm lg:justify-end">
           <Link
-            to="/"
+            to="/scores"
             className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
-              pathname === '/'
+              pathname === '/scores'
                 ? 'bg-emerald-700 text-white'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
             }`}
           >
             Scores
@@ -66,17 +76,57 @@ export default function Layout({
             className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               pathname === '/players'
                 ? 'bg-emerald-700 text-white'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
             }`}
           >
             Players
+          </Link>
+          <Link
+            to="/itinerary"
+            className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              pathname === '/itinerary'
+                ? 'bg-emerald-700 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+            }`}
+          >
+            Itinerary
+          </Link>
+          <Link
+            to="/scorecards"
+            className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              pathname.startsWith('/scorecards')
+                ? 'bg-emerald-700 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+            }`}
+          >
+            Cards
+          </Link>
+          <Link
+            to="/merch"
+            className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              pathname === '/merch'
+                ? 'bg-emerald-700 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+            }`}
+          >
+            Merch
+          </Link>
+          <Link
+            to="/games"
+            className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              pathname === '/games'
+                ? 'bg-emerald-700 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+            }`}
+          >
+            Games
           </Link>
           <Link
             to="/my-player"
             className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               pathname === '/my-player'
                 ? 'bg-emerald-700 text-white'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
             }`}
           >
             Me
@@ -86,7 +136,7 @@ export default function Layout({
             className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               pathname === '/admin'
                 ? 'bg-emerald-700 text-white'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
             }`}
           >
             Admin
