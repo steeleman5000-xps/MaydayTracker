@@ -36,6 +36,8 @@ export interface Round {
   teeGender?: 'male' | 'female';
   courseRating?: number;
   slopeRating?: number;
+  courseLogoUrl?: string;
+  courseBrandColor?: string;
   pars?: number[];
   yardages?: number[];
   // strokeIndexes[i] = stroke index rating for hole (i+1), values 1–18
@@ -135,6 +137,20 @@ export interface AppConfig {
   teamBName: string;
   adminPin: string;
   activeTripId?: string;
+}
+
+export type TripEventCategory = 'golf' | 'meal' | 'travel' | 'lodging' | 'meeting' | 'other';
+
+export interface TripEvent {
+  id: string;
+  tripId: string;
+  date: string;
+  time?: string;
+  title: string;
+  location?: string;
+  notes?: string;
+  category: TripEventCategory;
+  createdAt: number;
 }
 
 export interface MatchResult {

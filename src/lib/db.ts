@@ -12,7 +12,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Player, Round, Matchup, AppConfig, HoleWager, Trip, Wager, ManualResult, ManualPlayerTotals } from '../types';
+import type { Player, Round, Matchup, AppConfig, HoleWager, Trip, Wager, ManualResult, ManualPlayerTotals, TripEvent } from '../types';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +94,28 @@ export async function updateRound(id: string, round: Partial<Round>): Promise<vo
 
 export async function deleteRound(id: string): Promise<void> {
   await deleteDoc(doc(db, 'rounds', id));
+}
+
+// ── Itinerary ────────────────────────────────────────────────────────────────
+
+export function subscribeTripEvents(cb: (events: TripEvent[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'tripEvents'), orderBy('date')),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as TripEvent))
+  );
+}
+
+export async function addTripEvent(event: Omit<TripEvent, 'id'>): Promise<string> {
+  const ref = await addDoc(collection(db, 'tripEvents'), event);
+  return ref.id;
+}
+
+export async function updateTripEvent(id: string, event: Partial<TripEvent>): Promise<void> {
+  await updateDoc(doc(db, 'tripEvents', id), event);
+}
+
+export async function deleteTripEvent(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'tripEvents', id));
 }
 
 // ── Matchups ──────────────────────────────────────────────────────────────────
