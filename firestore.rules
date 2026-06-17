@@ -1,9 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Public read + write — no auth required (trip group share-link model)
-    // Tighten this to read-only for specific collections if needed.
-    match /{document=**} {
+    // Public test rules for the Mayday share-link model.
+    // Anyone with the app URL can update trip setup and scores.
+    match /config/settings {
+      allow read, write: if true;
+    }
+
+    match /players/{playerId} {
+      allow read, write: if true;
+    }
+
+    match /trips/{tripId} {
+      allow read, write: if true;
+    }
+
+    match /rounds/{roundId} {
+      allow read, write: if true;
+    }
+
+    match /matchups/{matchupId} {
       allow read, write: if true;
     }
   }

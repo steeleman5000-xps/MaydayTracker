@@ -1,29 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import type { Matchup, Player, Round, AppConfig } from '../types';
+import type { Matchup, Player, Round, AppConfig, Trip, ManualPlayerTotals } from '../types';
 import {
-  subscribeMatchup, subscribeConfig, subscribeRounds, subscribePlayers,
-  updateHoleScore, setMatchupStatus, saveHoleWager, type ScoreField,
+  subscribeMatchup, subscribeConfig, subscribeRounds, subscribePlayers, subscribeTrips,
+  updateHoleScore, setMatchupStatus, saveHoleWager, saveMatchWager, saveManualResult, type ScoreField,
 } from '../lib/db';
-import type { WagerType, HoleWager } from '../types';
+import type { WagerType, HoleWager, Wager } from '../types';
 import { calcMatchResult } from '../lib/scoring';
 import { getHoleComment } from '../lib/holeComments';
 
 type LocalScores = Record<number, { a: string; a2: string; b: string; b2: string }>;
+type WagerTarget = { scope: 'match' } | { scope: 'hole'; hole: number };
+type ManualTotalField = keyof ManualPlayerTotals;
+type ManualTotalState = Record<ManualTotalField, string>;
+
+const EMPTY_MANUAL_TOTALS: ManualTotalState = {
+  playerA: '',
+  playerA2: '',
+  playerB: '',
+  playerB2: '',
+};
 
 export default function MatchScoring() {
   const { matchupId } = useParams<{ matchupId: string }>();
   const [matchup, setMatchup] = useState<Matchup | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [localScores, setLocalScores] = useState<LocalScores>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [wagerHole, setWagerHole] = useState<number | null>(null);
+  const [wagerTarget, setWagerTarget] = useState<WagerTarget | null>(null);
   const [wagerType, setWagerType] = useState<WagerType | null>(null);
   const [wagerAmount, setWagerAmount] = useState('');
+  const [manualTeamAScore, setManualTeamAScore] = useState('');
+  const [manualTeamBScore, setManualTeamBScore] = useState('');
+  const [manualPlayerTotals, setManualPlayerTotals] = useState<ManualTotalState>(EMPTY_MANUAL_TOTALS);
+  const [manualPoints, setManualPoints] = useState<'A' | 'B' | 'half'>('half');
   const saveTimer = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const lastReportedHoleRef = useRef(-1);
   const initializedRef = useRef(false);
@@ -35,6 +50,7 @@ export default function MatchScoring() {
       subscribeMatchup(matchupId, setMatchup),
       subscribePlayers(setPlayers),
       subscribeRounds(setRounds),
+      subscribeTrips(setTrips),
       subscribeConfig(setConfig),
     ];
     return () => unsubs.forEach((u) => u());
@@ -124,6 +140,22 @@ export default function MatchScoring() {
     return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
   }, [toast]);
 
+  useEffect(() => {
+    if (!matchup?.manualResult) return;
+    const totals = matchup.manualResult.playerTotals;
+    setManualTeamAScore(matchup.manualResult.teamAScore != null ? String(matchup.manualResult.teamAScore) : '');
+    setManualTeamBScore(matchup.manualResult.teamBScore != null ? String(matchup.manualResult.teamBScore) : '');
+    setManualPlayerTotals({
+      playerA: totals?.playerA != null ? String(totals.playerA) : '',
+      playerA2: totals?.playerA2 != null ? String(totals.playerA2) : '',
+      playerB: totals?.playerB != null ? String(totals.playerB) : '',
+      playerB2: totals?.playerB2 != null ? String(totals.playerB2) : '',
+    });
+    if (matchup.manualResult.pointsA === 1) setManualPoints('A');
+    else if (matchup.manualResult.pointsB === 1) setManualPoints('B');
+    else setManualPoints('half');
+  }, [matchup?.manualResult]);
+
   if (!matchupId || !matchup || !config || players.length === 0) {
     return (
       <Layout>
@@ -148,12 +180,15 @@ export default function MatchScoring() {
 
   const isFourball = matchup.format === 'fourball';
   const result = calcMatchResult(matchup, playerA, playerB, round.strokeIndexes, playerA2, playerB2);
+  const trip = trips.find((t) => t.id === round.tripId);
+  const teamAName = trip?.teamAName || config.teamAName;
+  const teamBName = trip?.teamBName || config.teamBName;
 
   const WAGER_LABELS: Record<WagerType, string> = {
-    money: '💵 Money',
-    alcohol: '🍺 Alcohol',
-    drugs: '💊 Drugs',
-    sexual_favors: '🫦 Sexual Favors',
+    money: 'Money',
+    drinks: 'Drinks',
+    bragging_rights: 'Bragging Rights',
+    custom: 'Custom',
   };
 
   function handleScoreChange(
@@ -190,13 +225,47 @@ export default function MatchScoring() {
     await setMatchupStatus(matchupId!, 'active');
   }
 
-  async function handlePlaceWager() {
-    if (!wagerHole || !wagerType || !wagerAmount.trim()) return;
-    const wager: HoleWager = { type: wagerType, amount: wagerAmount.trim(), createdAt: Date.now() };
-    await saveHoleWager(matchupId!, wagerHole, wager);
-    setWagerHole(null);
+  async function handleSaveManualResult(e: React.FormEvent) {
+    e.preventDefault();
+    const pointsA = manualPoints === 'A' ? 1 : manualPoints === 'half' ? 0.5 : 0;
+    const pointsB = manualPoints === 'B' ? 1 : manualPoints === 'half' ? 0.5 : 0;
+    const playerTotals: ManualPlayerTotals = {};
+    (Object.keys(manualPlayerTotals) as ManualTotalField[]).forEach((field) => {
+      if (manualPlayerTotals[field] !== '') playerTotals[field] = Number(manualPlayerTotals[field]);
+    });
+    setSaving(true);
+    await saveManualResult(matchupId!, {
+      teamAScore: manualTeamAScore ? Number(manualTeamAScore) : undefined,
+      teamBScore: manualTeamBScore ? Number(manualTeamBScore) : undefined,
+      playerTotals: Object.keys(playerTotals).length > 0 ? playerTotals : undefined,
+      pointsA,
+      pointsB,
+      createdAt: Date.now(),
+    });
+    setSaving(false);
+  }
+
+  function openWager(target: WagerTarget) {
+    setWagerTarget(target);
     setWagerType(null);
     setWagerAmount('');
+  }
+
+  function closeWager() {
+    setWagerTarget(null);
+    setWagerType(null);
+    setWagerAmount('');
+  }
+
+  async function handlePlaceWager() {
+    if (!wagerTarget || !wagerType || !wagerAmount.trim()) return;
+    const wager: Wager = { type: wagerType, amount: wagerAmount.trim(), createdAt: Date.now() };
+    if (wagerTarget.scope === 'match') {
+      await saveMatchWager(matchupId!, wager);
+    } else {
+      await saveHoleWager(matchupId!, wagerTarget.hole, wager);
+    }
+    closeWager();
   }
 
   function statusBadgeClass() {
@@ -222,6 +291,17 @@ export default function MatchScoring() {
   }
 
   const short = (p: Player) => p.name.split(' ')[0];
+  const cleanManualNumber = (raw: string) => raw.replace(/[^0-9]/g, '').slice(0, 3);
+  const manualTotalEntries = [
+    { field: 'playerA' as const, player: playerA, strokes: result.strokes.a1, color: 'text-blue-400' },
+    { field: 'playerA2' as const, player: playerA2, strokes: result.strokes.a2, color: 'text-blue-300' },
+    { field: 'playerB' as const, player: playerB, strokes: result.strokes.b1, color: 'text-red-400' },
+    { field: 'playerB2' as const, player: playerB2, strokes: result.strokes.b2, color: 'text-red-300' },
+  ].filter((entry) => entry.player);
+
+  function handleManualPlayerTotal(field: ManualTotalField, raw: string) {
+    setManualPlayerTotals((prev) => ({ ...prev, [field]: cleanManualNumber(raw) }));
+  }
 
   return (
     <Layout>
@@ -243,7 +323,7 @@ export default function MatchScoring() {
                 {playerA.name}{playerA2 ? ` & ${playerA2.name}` : ''}
               </div>
               <div className="text-slate-400 text-xs">
-                {config.teamAName} · HCP {playerA.handicap}{playerA2 ? `/${playerA2.handicap}` : ''}
+                {teamAName} · HCP {playerA.handicap}{playerA2 ? `/${playerA2.handicap}` : ''}
               </div>
             </div>
             <div className="text-slate-500 font-bold py-1">vs</div>
@@ -252,7 +332,7 @@ export default function MatchScoring() {
                 {playerB.name}{playerB2 ? ` & ${playerB2.name}` : ''}
               </div>
               <div className="text-slate-400 text-xs">
-                {config.teamBName} · HCP {playerB.handicap}{playerB2 ? `/${playerB2.handicap}` : ''}
+                {teamBName} · HCP {playerB.handicap}{playerB2 ? `/${playerB2.handicap}` : ''}
               </div>
             </div>
           </div>
@@ -288,6 +368,29 @@ export default function MatchScoring() {
             )}
             {saving && <span className="ml-2 text-xs font-normal opacity-60">saving…</span>}
           </div>
+
+          {matchup.manualResult && (
+            <div className="mt-2 rounded-lg border border-yellow-800 bg-yellow-950/60 px-3 py-2 text-sm text-yellow-200">
+              Manual result is active
+              {(matchup.manualResult.teamAScore || matchup.manualResult.teamBScore) && (
+                <span>
+                  : {matchup.manualResult.teamAScore ?? '-'} - {matchup.manualResult.teamBScore ?? '-'}
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-xs uppercase tracking-widest text-slate-500">Match Wager</div>
+              <div className="text-sm text-yellow-300 truncate">
+                {matchup.matchWager ? wagerLabel(matchup.matchWager) : 'No overall wager yet'}
+              </div>
+            </div>
+            <button className="btn-secondary text-sm shrink-0" onClick={() => openWager({ scope: 'match' })}>
+              {matchup.matchWager ? 'Edit' : 'Add'}
+            </button>
+          </div>
         </div>
 
         {/* Scoring grid */}
@@ -300,7 +403,7 @@ export default function MatchScoring() {
               result={result}
               localScores={localScores}
               onChange={handleScoreChange}
-              onWagerClick={(hole) => { setWagerHole(hole); setWagerType(null); setWagerAmount(''); }}
+              onWagerClick={(hole) => openWager({ scope: 'hole', hole })}
             />
           ) : (
             <SinglesGrid
@@ -309,9 +412,107 @@ export default function MatchScoring() {
               result={result}
               localScores={localScores}
               onChange={handleScoreChange}
-              onWagerClick={(hole) => { setWagerHole(hole); setWagerType(null); setWagerAmount(''); }}
+              onWagerClick={(hole) => openWager({ scope: 'hole', hole })}
             />
           )}
+        </div>
+
+        {/* Manual result fallback */}
+        <div className="card">
+          <h3 className="font-semibold mb-2">Manual Result</h3>
+          <p className="text-slate-500 text-xs mb-3">
+            Use this when the match was not tracked hole by hole. This overrides the hole-by-hole result for standings and records gross totals for the individual net champion.
+          </p>
+          <form onSubmit={handleSaveManualResult} className="space-y-4">
+            <div>
+              <div className="label">Individual Gross Totals</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {manualTotalEntries.map(({ field, player, strokes, color }) => {
+                  const gross = manualPlayerTotals[field] === '' ? null : Number(manualPlayerTotals[field]);
+                  const net = gross == null ? null : gross - strokes;
+                  return (
+                    <div key={field} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                      <label className={`block text-sm font-semibold mb-2 ${color}`}>
+                        {player!.name}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="input flex-1"
+                          type="number"
+                          min="0"
+                          inputMode="numeric"
+                          placeholder="gross"
+                          value={manualPlayerTotals[field]}
+                          onChange={(e) => handleManualPlayerTotal(field, e.target.value)}
+                        />
+                        <div className="w-24 text-right text-xs text-slate-400">
+                          <div>{strokes > 0 ? `${strokes} strokes` : '0 strokes'}</div>
+                          <div className="font-semibold text-slate-200">
+                            Net {net == null ? '-' : net}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label text-blue-400">{teamAName} Total</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  placeholder="optional"
+                  value={manualTeamAScore}
+                  onChange={(e) => setManualTeamAScore(cleanManualNumber(e.target.value))}
+                />
+              </div>
+              <div>
+                <label className="label text-red-400">{teamBName} Total</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  placeholder="optional"
+                  value={manualTeamBScore}
+                  onChange={(e) => setManualTeamBScore(cleanManualNumber(e.target.value))}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Match Points</label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'A' as const, label: `${teamAName} 1` },
+                  { id: 'half' as const, label: 'Half .5 / .5' },
+                  { id: 'B' as const, label: `${teamBName} 1` },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`rounded-lg border px-2 py-2 text-sm font-semibold ${
+                      manualPoints === option.id
+                        ? 'border-emerald-500 bg-emerald-700 text-white'
+                        : 'border-slate-600 bg-slate-700 text-slate-300'
+                    }`}
+                    onClick={() => setManualPoints(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="btn-primary w-full" disabled={saving}>
+              Save Manual Result
+            </button>
+          </form>
         </div>
 
         {/* Controls */}
@@ -334,22 +535,24 @@ export default function MatchScoring() {
       </div>
 
       {/* Wager modal */}
-      {wagerHole !== null && (
+      {wagerTarget !== null && (
         <div className="fixed inset-0 z-40 bg-black/70 flex items-end justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm p-5 space-y-4">
             <div className="text-center">
               <div className="text-2xl mb-1">🎲</div>
-              <h3 className="font-bold text-white text-lg">Hole {wagerHole} Wager</h3>
+              <h3 className="font-bold text-white text-lg">
+                {wagerTarget.scope === 'match' ? 'Match Wager' : `Hole ${wagerTarget.hole} Wager`}
+              </h3>
               <p className="text-slate-400 text-sm">What are we betting?</p>
             </div>
 
             {!wagerType ? (
               <div className="grid grid-cols-2 gap-2">
                 {([
-                  { type: 'money' as WagerType, label: '💵 Money', cls: 'border-emerald-700 hover:bg-emerald-900' },
-                  { type: 'alcohol' as WagerType, label: '🍺 Alcohol', cls: 'border-amber-700 hover:bg-amber-900' },
-                  { type: 'drugs' as WagerType, label: '💊 Drugs', cls: 'border-purple-700 hover:bg-purple-900' },
-                  { type: 'sexual_favors' as WagerType, label: '🫦 Sexual Favors', cls: 'border-pink-700 hover:bg-pink-900' },
+                  { type: 'money' as WagerType, label: 'Money', cls: 'border-emerald-700 hover:bg-emerald-900' },
+                  { type: 'drinks' as WagerType, label: 'Drinks', cls: 'border-amber-700 hover:bg-amber-900' },
+                  { type: 'bragging_rights' as WagerType, label: 'Bragging Rights', cls: 'border-blue-700 hover:bg-blue-900' },
+                  { type: 'custom' as WagerType, label: 'Custom', cls: 'border-purple-700 hover:bg-purple-900' },
                 ] as const).map(({ type, label, cls }) => (
                   <button
                     key={type}
@@ -402,7 +605,7 @@ export default function MatchScoring() {
 
             <button
               className="w-full text-slate-500 text-sm py-1"
-              onClick={() => { setWagerHole(null); setWagerType(null); setWagerAmount(''); }}
+              onClick={closeWager}
             >
               Cancel
             </button>
@@ -431,18 +634,22 @@ export default function MatchScoring() {
 
 // ── Wager chip ───────────────────────────────────────────────────────────────
 
-const WAGER_EMOJI: Record<WagerType, string> = {
-  money: '💵',
-  alcohol: '🍺',
-  drugs: '💊',
-  sexual_favors: '🫦',
+const WAGER_LABEL_SHORT: Record<WagerType, string> = {
+  money: '$',
+  drinks: 'Drinks',
+  bragging_rights: 'Pride',
+  custom: 'Bet',
 };
+
+function wagerLabel(wager: Wager): string {
+  return `${WAGER_LABEL_SHORT[wager.type]} ${wager.amount}`;
+}
 
 function WagerChip({ wager, onClick }: { wager?: HoleWager; onClick: () => void }) {
   if (wager) {
     return (
       <span className="text-xs text-yellow-300 font-medium">
-        {WAGER_EMOJI[wager.type]} {wager.amount}
+        {wagerLabel(wager)}
       </span>
     );
   }
