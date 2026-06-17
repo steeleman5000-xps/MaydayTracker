@@ -12,7 +12,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Player, Round, Matchup, AppConfig, HoleWager } from '../types';
+import type { Player, Round, Matchup, AppConfig, HoleWager, Trip, Wager, ManualResult, ManualPlayerTotals } from '../types';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,32 @@ export function subscribeConfig(cb: (cfg: AppConfig | null) => void): Unsubscrib
 
 export async function saveConfig(cfg: AppConfig): Promise<void> {
   await setDoc(doc(db, 'config', 'settings'), cfg);
+}
+
+// ── Trips ────────────────────────────────────────────────────────────────────
+
+export function subscribeTrips(cb: (trips: Trip[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'trips'), orderBy('createdAt')),
+    (snap) => cb(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as Trip)
+        .sort((a, b) => b.year - a.year || a.createdAt - b.createdAt)
+    )
+  );
+}
+
+export async function addTrip(t: Omit<Trip, 'id'>): Promise<string> {
+  const ref = await addDoc(collection(db, 'trips'), t);
+  return ref.id;
+}
+
+export async function updateTrip(id: string, t: Partial<Trip>): Promise<void> {
+  await updateDoc(doc(db, 'trips', id), t);
+}
+
+export async function deleteTrip(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'trips', id));
 }
 
 // ── Players ──────────────────────────────────────────────────────────────────
@@ -98,6 +124,10 @@ export async function addMatchup(m: Omit<Matchup, 'id'>): Promise<string> {
   return ref.id;
 }
 
+export async function updateMatchup(id: string, m: Partial<Matchup>): Promise<void> {
+  await updateDoc(doc(db, 'matchups', id), m);
+}
+
 export async function deleteMatchup(id: string): Promise<void> {
   await deleteDoc(doc(db, 'matchups', id));
 }
@@ -129,4 +159,38 @@ export async function saveHoleWager(
   wager: HoleWager
 ): Promise<void> {
   await updateDoc(doc(db, 'matchups', matchupId), { [`wagers.${hole}`]: wager });
+}
+
+export async function saveMatchWager(
+  matchupId: string,
+  wager: Wager
+): Promise<void> {
+  await updateDoc(doc(db, 'matchups', matchupId), { matchWager: wager });
+}
+
+export async function saveManualResult(
+  matchupId: string,
+  manualResult: ManualResult
+): Promise<void> {
+  const cleanResult: ManualResult = {
+    pointsA: manualResult.pointsA,
+    pointsB: manualResult.pointsB,
+    createdAt: manualResult.createdAt,
+  };
+  if (manualResult.teamAScore != null) cleanResult.teamAScore = manualResult.teamAScore;
+  if (manualResult.teamBScore != null) cleanResult.teamBScore = manualResult.teamBScore;
+  if (manualResult.playerTotals) {
+    const playerTotals: ManualPlayerTotals = {};
+    if (manualResult.playerTotals.playerA != null) playerTotals.playerA = manualResult.playerTotals.playerA;
+    if (manualResult.playerTotals.playerA2 != null) playerTotals.playerA2 = manualResult.playerTotals.playerA2;
+    if (manualResult.playerTotals.playerB != null) playerTotals.playerB = manualResult.playerTotals.playerB;
+    if (manualResult.playerTotals.playerB2 != null) playerTotals.playerB2 = manualResult.playerTotals.playerB2;
+    if (Object.keys(playerTotals).length > 0) cleanResult.playerTotals = playerTotals;
+  }
+  if (manualResult.note) cleanResult.note = manualResult.note;
+
+  await updateDoc(doc(db, 'matchups', matchupId), {
+    manualResult: cleanResult,
+    status: 'complete',
+  });
 }

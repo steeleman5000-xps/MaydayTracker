@@ -1,22 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { subscribeConfig } from '../lib/db';
 
 interface Props {
   children: React.ReactNode;
 }
 
-const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN ?? 'mayday2025';
+const FALLBACK_ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN ?? 'mayday2025';
 const SESSION_KEY = 'mayday_admin_authed';
 
 export default function PinGate({ children }: Props) {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem(SESSION_KEY) === '1');
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [adminPin, setAdminPin] = useState(FALLBACK_ADMIN_PIN);
+  const [loadedPin, setLoadedPin] = useState(false);
+
+  useEffect(() => {
+    const unsub = subscribeConfig((cfg) => {
+      setAdminPin(cfg?.adminPin || FALLBACK_ADMIN_PIN);
+      setLoadedPin(true);
+    });
+    return () => unsub();
+  }, []);
 
   if (authed) return <>{children}</>;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
+    if (pin === adminPin) {
       sessionStorage.setItem(SESSION_KEY, '1');
       setAuthed(true);
     } else {
@@ -31,7 +42,9 @@ export default function PinGate({ children }: Props) {
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">⛳</div>
           <h1 className="text-xl font-bold">Admin Access</h1>
-          <p className="text-slate-400 text-sm mt-1">Enter the admin PIN</p>
+          <p className="text-slate-400 text-sm mt-1">
+            {loadedPin ? 'Enter the admin PIN' : 'Loading admin settings...'}
+          </p>
         </div>
         <form onSubmit={submit} className="flex flex-col gap-3">
           <input
@@ -43,7 +56,7 @@ export default function PinGate({ children }: Props) {
             autoFocus
           />
           {error && <p className="text-red-400 text-sm text-center">Incorrect PIN</p>}
-          <button type="submit" className="btn-primary">Enter</button>
+          <button type="submit" className="btn-primary" disabled={!loadedPin}>Enter</button>
         </form>
       </div>
     </div>
