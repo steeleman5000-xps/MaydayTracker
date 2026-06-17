@@ -4,14 +4,25 @@ import PinGate from '../components/PinGate';
 import AdminPlayers from '../components/AdminPlayers';
 import AdminRounds from '../components/AdminRounds';
 import AdminMatchups from '../components/AdminMatchups';
-import type { Player, Round, Matchup, AppConfig } from '../types';
-import { subscribeConfig, subscribePlayers, subscribeRounds, subscribeMatchups, saveConfig } from '../lib/db';
+import AdminTrips from '../components/AdminTrips';
+import type { Player, Round, Matchup, AppConfig, Trip } from '../types';
+import {
+  subscribeConfig,
+  subscribePlayers,
+  subscribeRounds,
+  subscribeMatchups,
+  subscribeTrips,
+  saveConfig,
+} from '../lib/db';
+import { tripBackgroundUrl } from '../lib/tripAssets';
+import { useTripSelection } from '../lib/tripSelection';
 
-type Tab = 'setup' | 'players' | 'rounds' | 'matchups';
+type Tab = 'setup' | 'trips' | 'players' | 'rounds' | 'matchups';
 
 export default function Admin() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
   const [tab, setTab] = useState<Tab>('setup');
@@ -21,6 +32,7 @@ export default function Admin() {
     adminPin: import.meta.env.VITE_ADMIN_PIN ?? 'mayday2025',
   });
   const [savingConfig, setSavingConfig] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubs = [
@@ -28,6 +40,7 @@ export default function Admin() {
         setConfig(cfg);
         if (cfg) setConfigForm(cfg);
       }),
+      subscribeTrips(setTrips),
       subscribePlayers(setPlayers),
       subscribeRounds(setRounds),
       subscribeMatchups(setMatchups),
@@ -38,20 +51,49 @@ export default function Admin() {
   async function handleSaveConfig(e: React.FormEvent) {
     e.preventDefault();
     setSavingConfig(true);
-    await saveConfig(configForm);
-    setSavingConfig(false);
+    setConfigError(null);
+    try {
+      await saveConfig(configForm);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown Firebase error';
+      setConfigError(`Settings could not be saved: ${message}`);
+    } finally {
+      setSavingConfig(false);
+    }
   }
+
+  const activeConfig = config ?? configForm;
+  const { selectedTripId, selectedTrip, selectedRounds, hasUnassignedRounds, selectTrip } = useTripSelection({
+    trips,
+    rounds,
+    config: activeConfig,
+  });
+  const activeTrip = selectedTrip ?? trips.find((trip) => trip.id === activeConfig.activeTripId);
+  const selectedRoundIds = new Set(selectedRounds.map((round) => round.id));
+  const selectedMatchups = matchups.filter((matchup) => selectedRoundIds.has(matchup.roundId));
+  const tripConfig = {
+    ...activeConfig,
+    teamAName: activeTrip?.teamAName || activeConfig.teamAName,
+    teamBName: activeTrip?.teamBName || activeConfig.teamBName,
+  };
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'setup', label: 'Setup' },
+    { id: 'trips', label: `Trips (${trips.length})` },
     { id: 'players', label: `Players (${players.length})` },
-    { id: 'rounds', label: `Rounds (${rounds.length})` },
-    { id: 'matchups', label: `Matchups (${matchups.length})` },
+    { id: 'rounds', label: `Rounds (${selectedRounds.length})` },
+    { id: 'matchups', label: `Matchups (${selectedMatchups.length})` },
   ];
 
   return (
     <PinGate>
-      <Layout>
+      <Layout
+        backgroundUrl={tripBackgroundUrl(selectedTrip)}
+        trips={trips}
+        selectedTripId={selectedTripId}
+        hasUnassignedRounds={hasUnassignedRounds}
+        onTripChange={selectTrip}
+      >
         <h1 className="text-2xl font-black mb-4">Admin</h1>
 
         <div className="flex gap-1 mb-6 bg-slate-800 rounded-xl p-1 overflow-x-auto">
@@ -94,6 +136,22 @@ export default function Admin() {
                   </div>
                 </div>
                 <div>
+                  <label className="label">Current Trip</label>
+                  <select
+                    className="input"
+                    value={configForm.activeTripId ?? ''}
+                    onChange={(e) => setConfigForm({ ...configForm, activeTripId: e.target.value })}
+                  >
+                    <option value="">No trip selected</option>
+                    {trips.map((trip) => (
+                      <option key={trip.id} value={trip.id}>{trip.year} {trip.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-slate-500 text-xs mt-1">
+                    Add trips in the Trips tab, then select the current one here.
+                  </p>
+                </div>
+                <div>
                   <label className="label">Admin PIN</label>
                   <input
                     className="input"
@@ -107,14 +165,24 @@ export default function Admin() {
                   </p>
                 </div>
                 <button type="submit" className="btn-primary w-full" disabled={savingConfig}>
-                  {config ? 'Update Settings' : 'Save Settings'}
+                  {savingConfig ? 'Saving...' : config ? 'Update Settings' : 'Save Settings'}
                 </button>
+                {configError && (
+                  <div className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
+                    {configError}
+                  </div>
+                )}
               </form>
             </div>
 
             <div className="card text-sm text-slate-400 space-y-2">
               <p className="font-semibold text-white">Quick Stats</p>
               <p>Players: <span className="text-white">{players.length}</span> ({players.filter(p => p.teamId === 'A').length} vs {players.filter(p => p.teamId === 'B').length})</p>
+              <p>Selected trip: <span className="text-white">{activeTrip ? `${activeTrip.year} ${activeTrip.name}` : 'None selected'}</span></p>
+              {activeTrip && (
+                <p>Trip teams: <span className="text-blue-400">{tripConfig.teamAName}</span> vs <span className="text-red-400">{tripConfig.teamBName}</span></p>
+              )}
+              <p>Trips: <span className="text-white">{trips.length}</span></p>
               <p>Rounds: <span className="text-white">{rounds.length}</span></p>
               <p>Matchups: <span className="text-white">{matchups.length}</span></p>
             </div>
@@ -122,6 +190,7 @@ export default function Admin() {
             <div className="card text-sm text-slate-400 space-y-2">
               <p className="font-semibold text-white">Workflow</p>
               <ol className="list-decimal list-inside space-y-1">
+                <li>Add this year in <strong className="text-white">Trips</strong> and mark it current</li>
                 <li>Set team names above</li>
                 <li>Add all 20 players under <strong className="text-white">Players</strong></li>
                 <li>Add 3 rounds with course names + stroke indexes under <strong className="text-white">Rounds</strong></li>
@@ -132,20 +201,20 @@ export default function Admin() {
           </div>
         )}
 
-        {tab === 'players' && config && (
-          <AdminPlayers players={players} config={config} />
-        )}
-        {tab === 'players' && !config && (
-          <p className="text-slate-400">Save settings first.</p>
+        {tab === 'trips' && (
+          <AdminTrips trips={trips} players={players} config={activeConfig} />
         )}
 
-        {tab === 'rounds' && <AdminRounds rounds={rounds} />}
-
-        {tab === 'matchups' && config && (
-          <AdminMatchups rounds={rounds} players={players} matchups={matchups} config={config} />
+        {tab === 'players' && (
+          <AdminPlayers players={players} config={tripConfig} />
         )}
-        {tab === 'matchups' && !config && (
-          <p className="text-slate-400">Save settings first.</p>
+
+        {tab === 'rounds' && (
+          <AdminRounds rounds={rounds} trips={trips} selectedTripId={selectedTripId} />
+        )}
+
+        {tab === 'matchups' && (
+          <AdminMatchups rounds={selectedRounds} players={players} matchups={selectedMatchups} config={tripConfig} />
         )}
       </Layout>
     </PinGate>

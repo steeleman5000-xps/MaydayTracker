@@ -1,30 +1,67 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import MatchCard from '../components/MatchCard';
-import type { Player, Round, Matchup, AppConfig } from '../types';
-import { subscribeConfig, subscribePlayers, subscribeRounds, subscribeMatchups } from '../lib/db';
+import type { Player, Round, Matchup, AppConfig, Trip } from '../types';
+import { subscribeConfig, subscribePlayers, subscribeRounds, subscribeMatchups, subscribeTrips } from '../lib/db';
 import { calcMatchResult, aggregateTeamPoints } from '../lib/scoring';
+import { tripBackgroundUrl } from '../lib/tripAssets';
+import { useTripSelection } from '../lib/tripSelection';
 
 export default function Scoreboard() {
   const [config, setConfig] = useState<AppConfig | null>(null);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
+  const [loaded, setLoaded] = useState({
+    config: false,
+    trips: false,
+    players: false,
+    rounds: false,
+    matchups: false,
+  });
 
   useEffect(() => {
     const unsubs = [
-      subscribeConfig(setConfig),
-      subscribePlayers(setPlayers),
-      subscribeRounds(setRounds),
-      subscribeMatchups(setMatchups),
+      subscribeConfig((cfg) => {
+        setConfig(cfg);
+        setLoaded((prev) => ({ ...prev, config: true }));
+      }),
+      subscribeTrips((nextTrips) => {
+        setTrips(nextTrips);
+        setLoaded((prev) => ({ ...prev, trips: true }));
+      }),
+      subscribePlayers((nextPlayers) => {
+        setPlayers(nextPlayers);
+        setLoaded((prev) => ({ ...prev, players: true }));
+      }),
+      subscribeRounds((nextRounds) => {
+        setRounds(nextRounds);
+        setLoaded((prev) => ({ ...prev, rounds: true }));
+      }),
+      subscribeMatchups((nextMatchups) => {
+        setMatchups(nextMatchups);
+        setLoaded((prev) => ({ ...prev, matchups: true }));
+      }),
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
 
-  const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
-  const roundMap = Object.fromEntries(rounds.map((r) => [r.id, r]));
+  const loading = !loaded.config || !loaded.trips || !loaded.players || !loaded.rounds || !loaded.matchups;
+  const { selectedTripId, selectedTrip, selectedRounds: visibleRounds, hasUnassignedRounds, selectTrip } = useTripSelection({
+    trips,
+    rounds,
+    config,
+    ready: !loading,
+  });
 
-  const allResults = matchups.flatMap((m) => {
+  const visibleRoundIds = new Set(visibleRounds.map((round) => round.id));
+  const visibleMatchups = matchups.filter((matchup) => visibleRoundIds.has(matchup.roundId));
+
+  const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
+  const roundMap = Object.fromEntries(visibleRounds.map((r) => [r.id, r]));
+
+  const allResults = visibleMatchups.flatMap((m) => {
     const pA = playerMap[m.playerAId];
     const pB = playerMap[m.playerBId];
     const pA2 = m.playerA2Id ? playerMap[m.playerA2Id] : undefined;
@@ -35,15 +72,15 @@ export default function Scoreboard() {
   });
 
   const totals = aggregateTeamPoints(allResults);
-  const teamAName = config?.teamAName ?? 'Team A';
-  const teamBName = config?.teamBName ?? 'Team B';
-  const maxPoints = rounds.length * players.filter((p) => p.teamId === 'A').length;
-
-  const loading = !config && rounds.length === 0 && players.length === 0;
+  const maxPoints = visibleRounds.length * players.filter((p) => p.teamId === 'A').length;
+  const teamAName = selectedTrip?.teamAName || config?.teamAName || 'Team A';
+  const teamBName = selectedTrip?.teamBName || config?.teamBName || 'Team B';
+  const displayConfig = config ? { ...config, teamAName, teamBName } : null;
+  const backgroundUrl = tripBackgroundUrl(selectedTrip);
 
   if (loading) {
     return (
-      <Layout>
+      <Layout backgroundUrl={backgroundUrl}>
         <div className="flex items-center justify-center h-64 text-slate-400">
           Loading…
         </div>
@@ -51,20 +88,33 @@ export default function Scoreboard() {
     );
   }
 
-  if (rounds.length === 0) {
+  if (visibleRounds.length === 0) {
     return (
-      <Layout>
-        <div className="text-center py-20 text-slate-400">
+      <Layout
+        trips={trips}
+        selectedTripId={selectedTripId}
+        hasUnassignedRounds={hasUnassignedRounds}
+        onTripChange={selectTrip}
+      >
+        <div className="space-y-4">
+          <div className="text-center py-20 text-slate-400">
           <div className="text-5xl mb-4">⛳</div>
           <p className="text-lg font-medium">Tournament not set up yet.</p>
           <p className="text-sm mt-1">Head to Admin to add players, rounds, and matchups.</p>
+          </div>
         </div>
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout
+      backgroundUrl={backgroundUrl}
+      trips={trips}
+      selectedTripId={selectedTripId}
+      hasUnassignedRounds={hasUnassignedRounds}
+      onTripChange={selectTrip}
+    >
       <div className="space-y-6">
         {/* Team scoreboard */}
         <div className="card">
@@ -83,14 +133,14 @@ export default function Scoreboard() {
           </div>
           {maxPoints > 0 && (
             <div className="mt-3 text-center text-slate-500 text-xs">
-              {maxPoints} points available across {rounds.length} round{rounds.length > 1 ? 's' : ''}
+              {maxPoints} points available across {visibleRounds.length} round{visibleRounds.length > 1 ? 's' : ''}
             </div>
           )}
         </div>
 
         {/* Per-round breakdown */}
-        {rounds.map((round) => {
-          const roundMatchups = matchups.filter((m) => m.roundId === round.id);
+        {visibleRounds.map((round) => {
+          const roundMatchups = visibleMatchups.filter((m) => m.roundId === round.id);
           const roundResults = roundMatchups.flatMap((m) => {
             const pA = playerMap[m.playerAId];
             const pB = playerMap[m.playerBId];
@@ -123,7 +173,7 @@ export default function Scoreboard() {
                   const pB = playerMap[m.playerBId];
                   const pA2 = m.playerA2Id ? playerMap[m.playerA2Id] : undefined;
                   const pB2 = m.playerB2Id ? playerMap[m.playerB2Id] : undefined;
-                  if (!pA || !pB || !config) return null;
+                  if (!pA || !pB || !displayConfig) return null;
                   return (
                     <MatchCard
                       key={m.id}
@@ -133,7 +183,7 @@ export default function Scoreboard() {
                       playerA2={pA2}
                       playerB2={pB2}
                       round={round}
-                      config={config}
+                      config={displayConfig}
                     />
                   );
                 })}
