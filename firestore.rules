@@ -19,6 +19,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /savedCourses/{courseId} {
+      allow read, write: if true;
+    }
+
     match /matchups/{matchupId} {
       allow read, write: if true;
     }

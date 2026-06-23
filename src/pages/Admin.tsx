@@ -6,7 +6,8 @@ import AdminRounds from '../components/AdminRounds';
 import AdminMatchups from '../components/AdminMatchups';
 import AdminTrips from '../components/AdminTrips';
 import AdminItinerary from '../components/AdminItinerary';
-import type { Player, Round, Matchup, AppConfig, Trip, TripEvent } from '../types';
+import AdminCourses from '../components/AdminCourses';
+import type { Player, Round, Matchup, AppConfig, Trip, TripEvent, SavedCourse } from '../types';
 import {
   subscribeConfig,
   subscribePlayers,
@@ -14,18 +15,20 @@ import {
   subscribeMatchups,
   subscribeTrips,
   subscribeTripEvents,
+  subscribeSavedCourses,
   saveConfig,
 } from '../lib/db';
 import { tripBackgroundUrl } from '../lib/tripAssets';
 import { useTripSelection } from '../lib/tripSelection';
 
-type Tab = 'setup' | 'trips' | 'players' | 'rounds' | 'matchups' | 'itinerary';
+type Tab = 'setup' | 'trips' | 'players' | 'courses' | 'rounds' | 'matchups' | 'itinerary';
 
 export default function Admin() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
   const [events, setEvents] = useState<TripEvent[]>([]);
   const [tab, setTab] = useState<Tab>('setup');
@@ -46,6 +49,7 @@ export default function Admin() {
       subscribeTrips(setTrips),
       subscribePlayers(setPlayers),
       subscribeRounds(setRounds),
+      subscribeSavedCourses(setSavedCourses),
       subscribeMatchups(setMatchups),
       subscribeTripEvents(setEvents),
     ];
@@ -86,6 +90,7 @@ export default function Admin() {
     { id: 'setup', label: 'Setup' },
     { id: 'trips', label: `Trips (${trips.length})` },
     { id: 'players', label: `Players (${players.length})` },
+    { id: 'courses', label: `Courses (${savedCourses.length})` },
     { id: 'rounds', label: `Rounds (${selectedRounds.length})` },
     { id: 'matchups', label: `Matchups (${selectedMatchups.length})` },
     { id: 'itinerary', label: `Itinerary (${selectedEvents.length})` },
@@ -189,6 +194,7 @@ export default function Admin() {
                 <p>Trip teams: <span className="text-blue-400">{tripConfig.teamAName}</span> vs <span className="text-red-400">{tripConfig.teamBName}</span></p>
               )}
               <p>Trips: <span className="text-white">{trips.length}</span></p>
+              <p>Saved courses: <span className="text-white">{savedCourses.length}</span></p>
               <p>Rounds: <span className="text-white">{rounds.length}</span></p>
               <p>Matchups: <span className="text-white">{matchups.length}</span></p>
               <p>Itinerary items: <span className="text-white">{selectedEvents.length}</span></p>
@@ -200,7 +206,8 @@ export default function Admin() {
                 <li>Add this year in <strong className="text-white">Trips</strong> and mark it current</li>
                 <li>Set team names above</li>
                 <li>Add all 20 players under <strong className="text-white">Players</strong></li>
-                <li>Add 3 rounds with course names + stroke indexes under <strong className="text-white">Rounds</strong></li>
+                <li>Add missing course scorecards once under <strong className="text-white">Courses</strong></li>
+                <li>Add 3 rounds with API or saved scorecards under <strong className="text-white">Rounds</strong></li>
                 <li>Create matchups (Team A vs Team B pairs) under <strong className="text-white">Matchups</strong></li>
                 <li>Add lodging, meals, notes, and tee logistics under <strong className="text-white">Itinerary</strong></li>
                 <li>Share the app URL — anyone can tap a match to enter scores live</li>
@@ -217,8 +224,12 @@ export default function Admin() {
           <AdminPlayers players={players} config={tripConfig} />
         )}
 
+        {tab === 'courses' && (
+          <AdminCourses courses={savedCourses} />
+        )}
+
         {tab === 'rounds' && (
-          <AdminRounds rounds={rounds} trips={trips} selectedTripId={selectedTripId} />
+          <AdminRounds rounds={rounds} trips={trips} selectedTripId={selectedTripId} savedCourses={savedCourses} />
         )}
 
         {tab === 'matchups' && (
