@@ -25,15 +25,18 @@ export interface Trip {
   createdAt: number;
 }
 
+export type TeeGender = 'male' | 'female' | 'unisex';
+
 export interface Round {
   id: string;
   tripId?: string;
   number: number;
   courseName: string;
   courseApiId?: number;
+  savedCourseId?: string;
   courseClubName?: string;
   teeName?: string;
-  teeGender?: 'male' | 'female';
+  teeGender?: TeeGender;
   courseRating?: number;
   slopeRating?: number;
   courseLogoUrl?: string;
@@ -77,6 +80,37 @@ export interface GolfCourseApiCourse {
     male?: GolfCourseTeeBox[];
     female?: GolfCourseTeeBox[];
   };
+}
+
+export interface SavedCourseTeeBox {
+  id: string;
+  teeName: string;
+  gender: TeeGender;
+  courseRating?: number;
+  slopeRating?: number;
+  totalYards: number;
+  parTotal: number;
+  holes: GolfCourseHole[];
+}
+
+export interface SavedCourse {
+  id: string;
+  clubName: string;
+  courseName?: string;
+  location?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  logoUrl?: string;
+  brandColor?: string;
+  tees: SavedCourseTeeBox[];
+  source: 'manual';
+  createdAt: number;
+  updatedAt?: number;
 }
 
 export interface HoleScores {
