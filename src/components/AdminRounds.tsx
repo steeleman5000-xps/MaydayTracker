@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GolfCourseApiCourse, GolfCourseTeeBox, Round, Trip } from '../types';
+import type { GolfCourseApiCourse, GolfCourseTeeBox, Round, SavedCourse, SavedCourseTeeBox, Trip } from '../types';
 import { saveRound, updateRound, deleteRound } from '../lib/db';
 import { getGolfCourse, searchGolfCourses } from '../lib/golfCourses';
 
@@ -7,13 +7,14 @@ interface Props {
   rounds: Round[];
   trips: Trip[];
   selectedTripId: string;
+  savedCourses: SavedCourse[];
 }
 
 const DEFAULT_SI = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
 type RoundForm = Omit<Round, 'id' | 'createdAt'>;
 const BLANK_ROUND: RoundForm = { tripId: '', number: 1, courseName: '', strokeIndexes: [...DEFAULT_SI] };
 
-export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
+export default function AdminRounds({ rounds, trips, selectedTripId, savedCourses }: Props) {
   const [form, setForm] = useState(BLANK_ROUND);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -24,14 +25,21 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
   const [courseLoading, setCourseLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<GolfCourseApiCourse | null>(null);
   const [selectedTeeKey, setSelectedTeeKey] = useState('');
+  const [selectedSavedCourseId, setSelectedSavedCourseId] = useState('');
+  const [selectedSavedTeeId, setSelectedSavedTeeId] = useState('');
   const filteredRounds = rounds.filter((round) => (
     selectedTripId ? round.tripId === selectedTripId : !round.tripId
   ));
+  const selectedSavedCourse = savedCourses.find((course) => course.id === selectedSavedCourseId);
 
   useEffect(() => {
     setForm((f) => ({ ...f, tripId: selectedTripId }));
     setExpanded(null);
     setEditState(null);
+    setSelectedCourse(null);
+    setSelectedTeeKey('');
+    setSelectedSavedCourseId('');
+    setSelectedSavedTeeId('');
   }, [selectedTripId]);
 
   async function handleAdd(e: React.FormEvent) {
@@ -46,6 +54,8 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
     setForm({ ...BLANK_ROUND, tripId: selectedTripId });
     setSelectedCourse(null);
     setSelectedTeeKey('');
+    setSelectedSavedCourseId('');
+    setSelectedSavedTeeId('');
     setSaving(false);
   }
 
@@ -109,6 +119,8 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
     try {
       const detail = await getGolfCourse(course.id);
       setSelectedCourse(detail);
+      setSelectedSavedCourseId('');
+      setSelectedSavedTeeId('');
       const firstTee = getTeeOptions(detail)[0];
       if (firstTee) {
         setSelectedTeeKey(firstTee.key);
@@ -128,6 +140,26 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
     if (option) applyTeeToForm(selectedCourse, option.gender, option.tee);
   }
 
+  function selectSavedCourse(courseId: string) {
+    setSelectedSavedCourseId(courseId);
+    setSelectedCourse(null);
+    setSelectedTeeKey('');
+    const course = savedCourses.find((item) => item.id === courseId);
+    const firstTee = course?.tees[0];
+    if (course && firstTee) {
+      setSelectedSavedTeeId(firstTee.id);
+      applySavedCourseTee(course, firstTee);
+    } else {
+      setSelectedSavedTeeId('');
+    }
+  }
+
+  function selectSavedTee(teeId: string) {
+    setSelectedSavedTeeId(teeId);
+    const tee = selectedSavedCourse?.tees.find((item) => item.id === teeId);
+    if (selectedSavedCourse && tee) applySavedCourseTee(selectedSavedCourse, tee);
+  }
+
   function applyTeeToForm(
     course: GolfCourseApiCourse,
     gender: 'male' | 'female',
@@ -143,12 +175,37 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
       ...current,
       courseName,
       courseApiId: course.id,
+      savedCourseId: undefined,
       courseClubName: course.club_name,
       teeName: tee.tee_name,
       teeGender: gender,
       courseRating: tee.course_rating,
       slopeRating: tee.slope_rating,
       courseBrandColor: current.courseBrandColor || '#0f766e',
+      pars: completeHoles.length ? completeHoles.map((hole) => hole.par) : undefined,
+      yardages: completeHoles.length ? completeHoles.map((hole) => hole.yardage) : undefined,
+      strokeIndexes: completeHoles.length ? completeHoles.map((hole) => hole.handicap) : current.strokeIndexes,
+    }));
+  }
+
+  function applySavedCourseTee(course: SavedCourse, tee: SavedCourseTeeBox) {
+    const completeHoles = tee.holes.length >= 18 ? tee.holes.slice(0, 18) : [];
+    const courseName = course.courseName && course.courseName !== course.clubName
+      ? `${course.clubName} - ${course.courseName}`
+      : course.clubName;
+
+    setForm((current) => ({
+      ...current,
+      courseName,
+      savedCourseId: course.id,
+      courseApiId: undefined,
+      courseClubName: course.clubName,
+      teeName: tee.teeName,
+      teeGender: tee.gender,
+      courseRating: tee.courseRating,
+      slopeRating: tee.slopeRating,
+      courseLogoUrl: course.logoUrl || current.courseLogoUrl,
+      courseBrandColor: course.brandColor || current.courseBrandColor || '#0f766e',
       pars: completeHoles.length ? completeHoles.map((hole) => hole.par) : undefined,
       yardages: completeHoles.length ? completeHoles.map((hole) => hole.yardage) : undefined,
       strokeIndexes: completeHoles.length ? completeHoles.map((hole) => hole.handicap) : current.strokeIndexes,
@@ -162,6 +219,7 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
       number: round.number,
       courseName: round.courseName,
       courseApiId: round.courseApiId,
+      savedCourseId: round.savedCourseId,
       courseClubName: round.courseClubName,
       teeName: round.teeName,
       teeGender: round.teeGender,
@@ -207,6 +265,51 @@ export default function AdminRounds({ rounds, trips, selectedTripId }: Props) {
                 Imported scorecards fill par, yardage, and stroke indexes. You can still edit indexes below.
               </p>
             </div>
+
+            {savedCourses.length > 0 && (
+              <div className="rounded-lg border border-slate-700 bg-slate-950/40 p-3 space-y-3">
+                <div>
+                  <label className="label">Use Saved Course</label>
+                  <select
+                    className="input"
+                    value={selectedSavedCourseId}
+                    onChange={(e) => selectSavedCourse(e.target.value)}
+                  >
+                    <option value="">Choose from local course library</option>
+                    {savedCourses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {formatSavedCourseName(course)}
+                        {course.location?.city || course.location?.state
+                          ? ` · ${[course.location.city, course.location.state].filter(Boolean).join(', ')}`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedSavedCourse && (
+                  <div>
+                    <label className="label">Saved Tee Box</label>
+                    <select
+                      className="input"
+                      value={selectedSavedTeeId}
+                      onChange={(e) => selectSavedTee(e.target.value)}
+                    >
+                      {selectedSavedCourse.tees.map((tee) => (
+                        <option key={tee.id} value={tee.id}>
+                          {tee.teeName} · {tee.totalYards} yards · par {tee.parTotal}
+                          {tee.courseRating && tee.slopeRating ? ` · ${tee.courseRating} / ${tee.slopeRating}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-500">
+                  Saved courses are copied onto the round. Later course-library edits will not rewrite old rounds.
+                </p>
+              </div>
+            )}
 
             {courseError && (
               <div className="rounded-lg border border-red-800 bg-red-950 px-3 py-2 text-sm text-red-200">
@@ -516,4 +619,11 @@ function cleanRoundPayload<T extends Partial<Round>>(round: T): T {
   return Object.fromEntries(
     Object.entries(round).filter(([, value]) => value !== undefined && value !== '')
   ) as T;
+}
+
+function formatSavedCourseName(course: SavedCourse): string {
+  if (course.courseName && course.courseName !== course.clubName) {
+    return `${course.clubName} - ${course.courseName}`;
+  }
+  return course.clubName;
 }

@@ -12,7 +12,19 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Player, Round, Matchup, AppConfig, HoleWager, Trip, Wager, ManualResult, ManualPlayerTotals, TripEvent } from '../types';
+import type {
+  Player,
+  Round,
+  Matchup,
+  AppConfig,
+  HoleWager,
+  Trip,
+  Wager,
+  ManualResult,
+  ManualPlayerTotals,
+  TripEvent,
+  SavedCourse,
+} from '../types';
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +106,28 @@ export async function updateRound(id: string, round: Partial<Round>): Promise<vo
 
 export async function deleteRound(id: string): Promise<void> {
   await deleteDoc(doc(db, 'rounds', id));
+}
+
+// ── Saved Courses ────────────────────────────────────────────────────────────
+
+export function subscribeSavedCourses(cb: (courses: SavedCourse[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'savedCourses'), orderBy('clubName')),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as SavedCourse))
+  );
+}
+
+export async function addSavedCourse(course: Omit<SavedCourse, 'id'>): Promise<string> {
+  const ref = await addDoc(collection(db, 'savedCourses'), course);
+  return ref.id;
+}
+
+export async function updateSavedCourse(id: string, course: Partial<SavedCourse>): Promise<void> {
+  await updateDoc(doc(db, 'savedCourses', id), course);
+}
+
+export async function deleteSavedCourse(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'savedCourses', id));
 }
 
 // ── Itinerary ────────────────────────────────────────────────────────────────
