@@ -22,6 +22,6 @@ export async function onRequest(context: PagesContext) {
     return response;
   }
 
-  const indexUrl = new URL('/index.html', url.origin);
+  const indexUrl = new URL('/', url.origin);
   return context.env.ASSETS.fetch(new Request(indexUrl.toString(), context.request));
 }
