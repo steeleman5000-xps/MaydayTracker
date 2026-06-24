@@ -63,6 +63,33 @@ const HALVED_LINES: Array<(a: string, b: string) => string> = [
   () => `The hole ended all square, which is generous because both sides looked emotionally foreclosed.`,
 ];
 
+const SOLO_BOGEY_LINES: Array<(player: string) => string> = [
+  (p) => `${p} made bogey with the confidence of a man who definitely blames the wind.`,
+  (p) => `Bogey for ${p}. Not a disaster, just the kind of slow leak that ruins a vacation rental deposit.`,
+  (p) => `${p} gave one back like the course had a Venmo request pending.`,
+  (p) => `Bogey. ${p} is officially playing defense against his own scorecard.`,
+  (p) => `${p} just turned a routine hole into a minor paperwork incident.`,
+  (p) => `One over for ${p}. The golf gods saw that and said, "yeah, sounds about right."`,
+];
+
+const SOLO_DOUBLE_LINES: Array<(player: string) => string> = [
+  (p) => `Double for ${p}. That hole had less structure than a bachelor party group chat.`,
+  (p) => `${p} just made double and somehow the cart GPS looks disappointed.`,
+  (p) => `Double bogey. ${p}'s handicap just opened a burner account.`,
+  (p) => `${p} turned that hole into a crime scene with a pencil.`,
+  (p) => `That double from ${p} had layers: bad plan, worse execution, elite denial.`,
+  (p) => `${p} made double like he was trying to get comped a lesson out of pity.`,
+];
+
+const SOLO_BLOWUP_LINES: Array<(player: string, overPar: number) => string> = [
+  (p, over) => `${p} went ${over} over on that hole. That's not scoring, that's a hostage note.`,
+  (p, over) => `${over} over for ${p}. Somewhere a starter just whispered, "we should have paired him with strangers."`,
+  (p, over) => `${p} just posted a ${over}-over masterpiece in recreational self-harm.`,
+  (p, over) => `${over} over. ${p}'s ball wasn't lost, it fled an unsafe work environment.`,
+  (p, over) => `${p} went ${over} over and made the scorecard ask for witness protection.`,
+  (p, over) => `${over} over for ${p}. The hole won, the course won, and basic dignity withdrew before the turn.`,
+];
+
 export function getHoleComment(
   winner: 'A' | 'B' | null,
   nameA: string,
@@ -74,4 +101,12 @@ export function getHoleComment(
   const loser = winner === 'A' ? nameB : nameA;
   const winnerName = winner === 'A' ? nameA : nameB;
   return pick(LOSER_LINES)(loser, winnerName);
+}
+
+export function getSoloHoleComment(player: string, score: number, par: number): string | null {
+  const overPar = score - par;
+  if (overPar <= 0) return null;
+  if (overPar === 1) return pick(SOLO_BOGEY_LINES)(player);
+  if (overPar === 2) return pick(SOLO_DOUBLE_LINES)(player);
+  return pick(SOLO_BLOWUP_LINES)(player, overPar);
 }

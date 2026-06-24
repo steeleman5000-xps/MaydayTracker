@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import Layout from '../components/Layout';
 import type { AppConfig, Player } from '../types';
@@ -207,6 +208,9 @@ export default function MyPlayer() {
                 {saving ? 'Saving...' : 'Save My Handicap & Tees'}
               </button>
             </form>
+            <Link to="/solo" className="btn-secondary mt-3 block text-center">
+              Open Solo Round Tracker
+            </Link>
           </div>
         ) : (
           <div className="card">

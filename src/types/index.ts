@@ -113,6 +113,31 @@ export interface SavedCourse {
   updatedAt?: number;
 }
 
+export interface SoloRound {
+  id: string;
+  playerId: string;
+  authUid?: string;
+  playerName: string;
+  playedAt: string;
+  courseName: string;
+  courseApiId?: number;
+  savedCourseId?: string;
+  courseClubName?: string;
+  teeName?: string;
+  teeGender?: TeeGender;
+  courseRating?: number;
+  slopeRating?: number;
+  courseLogoUrl?: string;
+  courseBrandColor?: string;
+  pars?: number[];
+  yardages?: number[];
+  strokeIndexes: number[];
+  scores: Record<number, number | null>;
+  status: 'active' | 'complete';
+  createdAt: number;
+  updatedAt?: number;
+}
+
 export interface HoleScores {
   // Singles: playerA / playerB
   // Fourball: playerA = A player 1, playerA2 = A player 2, etc.

@@ -102,6 +102,16 @@ export default function Layout({
             Cards
           </Link>
           <Link
+            to="/solo"
+            className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              pathname === '/solo'
+                ? 'bg-emerald-700 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+            }`}
+          >
+            Solo
+          </Link>
+          <Link
             to="/merch"
             className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               pathname === '/merch'

@@ -10,6 +10,7 @@ import Scorecards from './pages/Scorecards';
 import PrintableScorecard from './pages/PrintableScorecard';
 import Merch from './pages/Merch';
 import Games from './pages/Games';
+import SoloRounds from './pages/SoloRounds';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/itinerary" element={<Itinerary />} />
         <Route path="/scorecards" element={<Scorecards />} />
         <Route path="/scorecards/:matchupId" element={<PrintableScorecard />} />
+        <Route path="/solo" element={<SoloRounds />} />
         <Route path="/merch" element={<Merch />} />
         <Route path="/games" element={<Games />} />
         <Route path="/my-player" element={<MyPlayer />} />

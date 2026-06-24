@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   query,
   orderBy,
@@ -24,6 +25,7 @@ import type {
   ManualPlayerTotals,
   TripEvent,
   SavedCourse,
+  SoloRound,
 } from '../types';
 
 // ── Config ──────────────────────────────────────────────────────────────────
@@ -128,6 +130,44 @@ export async function updateSavedCourse(id: string, course: Partial<SavedCourse>
 
 export async function deleteSavedCourse(id: string): Promise<void> {
   await deleteDoc(doc(db, 'savedCourses', id));
+}
+
+// ── Solo Rounds ──────────────────────────────────────────────────────────────
+
+export function subscribeSoloRounds(cb: (rounds: SoloRound[]) => void): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, 'soloRounds'), orderBy('createdAt')),
+    (snap) => cb(
+      snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }) as SoloRound)
+        .sort((a, b) => b.createdAt - a.createdAt)
+    )
+  );
+}
+
+export async function addSoloRound(round: Omit<SoloRound, 'id'>): Promise<string> {
+  const ref = await addDoc(collection(db, 'soloRounds'), round);
+  return ref.id;
+}
+
+export async function updateSoloRound(id: string, round: Partial<SoloRound>): Promise<void> {
+  await updateDoc(doc(db, 'soloRounds', id), round);
+}
+
+export async function deleteSoloRound(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'soloRounds', id));
+}
+
+export async function updateSoloHoleScore(
+  roundId: string,
+  hole: number,
+  score: number | null
+): Promise<void> {
+  await updateDoc(doc(db, 'soloRounds', roundId), {
+    [`scores.${hole}`]: score ?? deleteField(),
+    status: 'active',
+    updatedAt: Date.now(),
+  });
 }
 
 // ── Itinerary ────────────────────────────────────────────────────────────────
