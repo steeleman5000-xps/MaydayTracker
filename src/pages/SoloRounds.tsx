@@ -29,6 +29,35 @@ type SoloRoundDraft = Omit<
   'id' | 'playerId' | 'authUid' | 'playerName' | 'scores' | 'status' | 'createdAt' | 'updatedAt'
 >;
 
+interface SoloRoundSummary {
+  holesPlayed: number;
+  gross: number;
+  parTotal: number;
+  toPar: number;
+  netEstimate: number | null;
+}
+
+interface SoloRoundEntry {
+  round: SoloRound;
+  handicap: number;
+  summary: SoloRoundSummary;
+}
+
+interface SoloLeaderboardRow {
+  key: string;
+  playerName: string;
+  rounds: number;
+  totalHoles: number;
+  avgGross: number;
+  bestGross: number;
+  avgNet: number | null;
+  bestNet: number | null;
+  avgToPar: number;
+  bestToPar: number;
+  lastPlayedAt: string;
+  lastCourse: string;
+}
+
 const DEFAULT_SI = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
 
 export default function SoloRounds() {
@@ -84,7 +113,9 @@ export default function SoloRounds() {
     );
   }, [players, user]);
 
-  const playerRounds = useMemo(() => {
+  const playersById = useMemo(() => new Map(players.map((p) => [p.id, p])), [players]);
+
+  const myRounds = useMemo(() => {
     if (!player && !user) return [];
     return soloRounds
       .filter((round) => round.playerId === player?.id || round.authUid === user?.uid)
@@ -92,9 +123,45 @@ export default function SoloRounds() {
   }, [player, soloRounds, user]);
 
   const activeRound = useMemo(() => {
-    if (activeRoundId) return playerRounds.find((round) => round.id === activeRoundId) ?? null;
-    return playerRounds.find((round) => round.status === 'active') ?? playerRounds[0] ?? null;
-  }, [activeRoundId, playerRounds]);
+    const selectedRound = activeRoundId ? myRounds.find((round) => round.id === activeRoundId) : null;
+    if (selectedRound) return selectedRound;
+    return myRounds.find((round) => round.status === 'active') ?? myRounds[0] ?? null;
+  }, [activeRoundId, myRounds]);
+
+  const completedRoundEntries = useMemo<SoloRoundEntry[]>(() => {
+    return soloRounds
+      .filter((round) => round.status === 'complete')
+      .map((round) => {
+        const handicap = playersById.get(round.playerId)?.handicap ?? 0;
+        return {
+          round,
+          handicap,
+          summary: summarizeRound(round, handicap),
+        };
+      })
+      .filter((entry) => entry.summary.holesPlayed > 0)
+      .sort((a, b) => b.round.createdAt - a.round.createdAt);
+  }, [playersById, soloRounds]);
+
+  const fullCompletedRoundEntries = useMemo(
+    () => completedRoundEntries.filter((entry) => entry.summary.holesPlayed === 18),
+    [completedRoundEntries]
+  );
+
+  const leaderboardRows = useMemo(
+    () => buildSoloLeaderboard(fullCompletedRoundEntries),
+    [fullCompletedRoundEntries]
+  );
+
+  const recentCompletedRounds = completedRoundEntries.slice(0, 10);
+  const leaderboardLeader = leaderboardRows[0] ?? null;
+  const mostRounds = leaderboardRows
+    .slice()
+    .sort((a, b) => b.rounds - a.rounds || (a.avgNet ?? 999) - (b.avgNet ?? 999))[0] ?? null;
+  const bestGross = leaderboardRows
+    .slice()
+    .sort((a, b) => a.bestGross - b.bestGross || (a.bestNet ?? 999) - (b.bestNet ?? 999))[0] ?? null;
+  const maxLeaderboardRounds = Math.max(1, ...leaderboardRows.map((row) => row.rounds));
 
   useEffect(() => {
     if (!activeRound) {
@@ -515,6 +582,92 @@ export default function SoloRounds() {
           </form>
         </div>
 
+        <section className="card">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">Solo Leaderboard</h2>
+              <p className="text-xs text-slate-500">
+                Completed 18-hole solo rounds from everyone in the crew.
+              </p>
+            </div>
+            <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-slate-300">
+              {fullCompletedRoundEntries.length} posted rounds
+            </span>
+          </div>
+
+          <div className="mb-4 grid gap-2 sm:grid-cols-3">
+            <LeaderboardCallout
+              label="Top Dawg"
+              value={leaderboardLeader ? `#1 ${leaderboardLeader.playerName}` : '-'}
+              detail={leaderboardLeader ? `Best net ${formatScore(leaderboardLeader.bestNet)} · avg ${formatScore(leaderboardLeader.avgNet)}` : 'Post a completed round to claim it.'}
+            />
+            <LeaderboardCallout
+              label="Best Gross"
+              value={bestGross ? `${bestGross.bestGross}` : '-'}
+              detail={bestGross ? `${bestGross.playerName} · ${bestGross.rounds} round${bestGross.rounds === 1 ? '' : 's'}` : 'No full cards yet.'}
+            />
+            <LeaderboardCallout
+              label="Ironman"
+              value={mostRounds ? `${mostRounds.rounds}` : '-'}
+              detail={mostRounds ? `${mostRounds.playerName} completed rounds` : 'No one has enough receipts yet.'}
+            />
+          </div>
+
+          {leaderboardRows.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-700 bg-slate-900/50 p-4 text-sm text-slate-400">
+              No completed 18-hole solo rounds yet. Once players mark rounds complete, this board ranks by best net, then average net.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-700">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="bg-slate-900/80 text-xs uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Rank</th>
+                    <th className="px-3 py-2 text-left">Player</th>
+                    <th className="px-3 py-2 text-center">Rounds</th>
+                    <th className="px-3 py-2 text-center">Best Net</th>
+                    <th className="px-3 py-2 text-center">Avg Net</th>
+                    <th className="px-3 py-2 text-center">Best Gross</th>
+                    <th className="px-3 py-2 text-center">Avg +/-</th>
+                    <th className="px-3 py-2 text-left">Last Posted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboardRows.map((row, index) => (
+                    <tr key={row.key} className="border-t border-slate-700">
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-black ${
+                          index === 0 ? 'bg-amber-400 text-slate-950' : index === 1 ? 'bg-slate-300 text-slate-950' : index === 2 ? 'bg-orange-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {index + 1}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="font-semibold text-white">{row.playerName}</div>
+                        <div className="mt-1 h-1.5 w-28 rounded-full bg-slate-800">
+                          <div
+                            className="h-1.5 rounded-full bg-emerald-400"
+                            style={{ width: `${Math.max(10, (row.rounds / maxLeaderboardRounds) * 100)}%` }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-center font-bold text-white">{row.rounds}</td>
+                      <td className="px-3 py-3 text-center font-bold text-emerald-300">{formatScore(row.bestNet)}</td>
+                      <td className="px-3 py-3 text-center">{formatScore(row.avgNet)}</td>
+                      <td className="px-3 py-3 text-center">{row.bestGross}</td>
+                      <td className="px-3 py-3 text-center">{formatToPar(Math.round(row.avgToPar * 10) / 10)}</td>
+                      <td className="px-3 py-3 text-slate-400">
+                        <div>{formatDate(row.lastPlayedAt)}</div>
+                        <div className="max-w-[12rem] truncate text-xs text-slate-500">{row.lastCourse}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         {activeRound && activeSummary && (
           <div className="card">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -613,30 +766,40 @@ export default function SoloRounds() {
           </div>
         )}
 
-        <div className="space-y-3">
+        <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold">Round History</h2>
-            <span className="text-xs text-slate-500">{playerRounds.length} rounds</span>
+            <div>
+              <h2 className="font-bold">My Rounds</h2>
+              <p className="text-xs text-slate-500">Resume, review, or delete accidental starts.</p>
+            </div>
+            <span className="text-xs text-slate-500">{myRounds.length} rounds</span>
           </div>
-          {playerRounds.length === 0 && (
+          {myRounds.length === 0 && (
             <div className="card text-sm text-slate-400">
               No solo rounds yet. Start one above and the history will build itself.
             </div>
           )}
-          {playerRounds.map((round) => {
+          {myRounds.map((round) => {
             const summary = summarizeRound(round, player.handicap);
             return (
-              <button
+              <article
                 key={round.id}
-                type="button"
-                className={`card block w-full text-left hover:border-emerald-600 ${
+                className={`card ${
                   activeRound?.id === round.id ? 'border-emerald-700' : ''
                 }`}
-                onClick={() => setActiveRoundId(round.id)}
               >
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate font-semibold text-white">{round.courseName}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="truncate font-semibold text-white">{round.courseName}</div>
+                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase ${
+                        round.status === 'complete'
+                          ? 'border-emerald-700 bg-emerald-950 text-emerald-200'
+                          : 'border-orange-700 bg-orange-950 text-orange-200'
+                      }`}>
+                        {round.status}
+                      </span>
+                    </div>
                     <div className="mt-1 text-xs text-slate-400">
                       {formatDate(round.playedAt)} · {round.teeName ?? 'Tee TBD'} · {summary.holesPlayed}/18 holes
                     </div>
@@ -646,10 +809,64 @@ export default function SoloRounds() {
                     <div className="text-xs text-slate-400">{formatToPar(summary.toPar)}</div>
                   </div>
                 </div>
-              </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    onClick={() => setActiveRoundId(round.id)}
+                  >
+                    {round.status === 'complete' ? 'View Card' : 'Resume'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-danger text-sm"
+                    disabled={saving}
+                    onClick={() => removeRound(round)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
             );
           })}
-        </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-bold">Completed Round Feed</h2>
+              <p className="text-xs text-slate-500">Recent posted solo rounds from everyone.</p>
+            </div>
+            <span className="text-xs text-slate-500">{completedRoundEntries.length} cards</span>
+          </div>
+          {recentCompletedRounds.length === 0 ? (
+            <div className="card text-sm text-slate-400">
+              No completed solo rounds have been posted yet.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {recentCompletedRounds.map(({ round, summary }) => (
+                <article key={round.id} className="card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white">{round.playerName}</div>
+                      <div className="mt-1 truncate text-sm text-slate-300">{round.courseName}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {formatDate(round.playedAt)} · {round.teeName ?? 'Tee TBD'} · {summary.holesPlayed}/18 holes
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-xl font-black text-white">{summary.gross || '-'}</div>
+                      <div className="text-xs text-slate-400">
+                        net {summary.netEstimate ?? '-'} · {formatToPar(summary.toPar)}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
       {toast && (
@@ -706,7 +923,70 @@ function formatSavedCourseName(course: SavedCourse): string {
   return course.clubName;
 }
 
-function summarizeRound(round: SoloRound, handicap: number) {
+function buildSoloLeaderboard(entries: SoloRoundEntry[]): SoloLeaderboardRow[] {
+  const groups = new Map<string, {
+    playerName: string;
+    rounds: number;
+    totalHoles: number;
+    grossScores: number[];
+    netScores: number[];
+    toPars: number[];
+    lastPlayedAt: string;
+    lastCourse: string;
+    lastCreatedAt: number;
+  }>();
+
+  entries.forEach(({ round, summary }) => {
+    const key = round.playerId || round.authUid || round.playerName;
+    const current = groups.get(key) ?? {
+      playerName: round.playerName,
+      rounds: 0,
+      totalHoles: 0,
+      grossScores: [],
+      netScores: [],
+      toPars: [],
+      lastPlayedAt: round.playedAt,
+      lastCourse: round.courseName,
+      lastCreatedAt: 0,
+    };
+
+    current.rounds += 1;
+    current.totalHoles += summary.holesPlayed;
+    current.grossScores.push(summary.gross);
+    current.toPars.push(summary.toPar);
+    if (summary.netEstimate != null) current.netScores.push(summary.netEstimate);
+    if ((round.updatedAt ?? round.createdAt) > current.lastCreatedAt) {
+      current.lastCreatedAt = round.updatedAt ?? round.createdAt;
+      current.lastPlayedAt = round.playedAt;
+      current.lastCourse = round.courseName;
+    }
+    groups.set(key, current);
+  });
+
+  return Array.from(groups.entries())
+    .map(([key, group]) => ({
+      key,
+      playerName: group.playerName,
+      rounds: group.rounds,
+      totalHoles: group.totalHoles,
+      avgGross: roundToTenth(average(group.grossScores)),
+      bestGross: Math.min(...group.grossScores),
+      avgNet: group.netScores.length ? roundToTenth(average(group.netScores)) : null,
+      bestNet: group.netScores.length ? Math.min(...group.netScores) : null,
+      avgToPar: roundToTenth(average(group.toPars)),
+      bestToPar: Math.min(...group.toPars),
+      lastPlayedAt: group.lastPlayedAt,
+      lastCourse: group.lastCourse,
+    }))
+    .sort((a, b) =>
+      (a.bestNet ?? 999) - (b.bestNet ?? 999) ||
+      (a.avgNet ?? 999) - (b.avgNet ?? 999) ||
+      a.avgGross - b.avgGross ||
+      b.rounds - a.rounds
+    );
+}
+
+function summarizeRound(round: SoloRound, handicap: number): SoloRoundSummary {
   const scoredHoles = Array.from({ length: 18 }, (_, index) => {
     const hole = index + 1;
     const score = round.scores?.[hole];
@@ -721,9 +1001,24 @@ function summarizeRound(round: SoloRound, handicap: number) {
   return {
     holesPlayed: scoredHoles.length,
     gross,
+    parTotal: playedPars,
     toPar,
     netEstimate,
   };
+}
+
+function average(values: number[]): number {
+  if (!values.length) return 0;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function roundToTenth(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function formatScore(value: number | null): string {
+  if (value == null) return '-';
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 function formatToPar(value: number): string {
@@ -753,6 +1048,16 @@ function Metric({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-lg border border-slate-700 bg-slate-900/70 px-2 py-3">
       <div className="text-lg font-black text-white">{value}</div>
       <div className="text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function LeaderboardCallout({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-300">{label}</div>
+      <div className="mt-1 text-lg font-black text-white">{value}</div>
+      <div className="mt-1 text-xs text-slate-500">{detail}</div>
     </div>
   );
 }
