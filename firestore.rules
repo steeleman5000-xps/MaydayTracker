@@ -34,5 +34,10 @@ service cloud.firestore {
     match /tripEvents/{eventId} {
       allow read, write: if true;
     }
+
+    match /auditEvents/{eventId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
   }
 }

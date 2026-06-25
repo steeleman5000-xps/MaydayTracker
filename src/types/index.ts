@@ -225,3 +225,27 @@ export interface MatchResult {
   strokes: { a1: number; a2: number; b1: number; b2: number };
   strokeHoles: Record<number, { a1: number; a2: number; b1: number; b2: number }>;
 }
+
+export type AuditAction = 'create' | 'set' | 'update' | 'delete';
+
+export interface AuditActor {
+  uid: string | null;
+  email: string | null;
+  displayName: string | null;
+  isAuthenticated: boolean;
+}
+
+export interface AuditEvent {
+  id: string;
+  collectionName: string;
+  documentId: string;
+  documentPath: string;
+  action: AuditAction;
+  changedFields: string[];
+  before: unknown;
+  after: unknown;
+  patch?: unknown;
+  actor: AuditActor;
+  createdAt: number;
+  source: 'web-client';
+}
