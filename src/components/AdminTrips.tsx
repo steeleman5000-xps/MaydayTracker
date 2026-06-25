@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { AppConfig, Player, Trip } from '../types';
 import { addTrip, deleteTrip, saveConfig, updateTrip } from '../lib/db';
-import { defaultBackgroundForTrip } from '../lib/tripAssets';
 
 interface Props {
   trips: Trip[];
@@ -31,7 +30,7 @@ export default function AdminTrips({ trips, players, config }: Props) {
         year: Number(year),
         teamAName: teamAName.trim() || config.teamAName,
         teamBName: teamBName.trim() || config.teamBName,
-        backgroundUrl: backgroundUrl.trim() || defaultBackgroundForTrip(Number(year), name.trim()),
+        backgroundUrl: backgroundUrl.trim(),
         createdAt: Date.now(),
       });
       await saveConfig({ ...config, activeTripId: config.activeTripId ?? id });
@@ -222,9 +221,9 @@ export default function AdminTrips({ trips, players, config }: Props) {
                       Save
                     </button>
                   </div>
-                ) : (trip.backgroundUrl || defaultBackgroundForTrip(trip.year, trip.name)) && (
+                ) : trip.backgroundUrl && (
                   <div className="text-slate-500 text-xs mt-1">
-                    Background: {trip.backgroundUrl || defaultBackgroundForTrip(trip.year, trip.name)}
+                    Background: {trip.backgroundUrl}
                   </div>
                 )}
               </div>
@@ -235,7 +234,7 @@ export default function AdminTrips({ trips, players, config }: Props) {
                     disabled={saving}
                     onClick={() => {
                       setEditingTripId(trip.id);
-                      setEditBackgroundUrl(trip.backgroundUrl || defaultBackgroundForTrip(trip.year, trip.name));
+                      setEditBackgroundUrl(trip.backgroundUrl || '');
                     }}
                   >
                     Background
