@@ -126,6 +126,12 @@ Existing players are matched by email first, then name.
 - Home page shows team totals + per-round breakdown
 - Updates in real time across all devices
 
+### Audit trail
+
+- Every app write to config, trips, players, rounds, saved courses, solo rounds, matchups, and itinerary events also writes an append-only `auditEvents` document.
+- Admin → Audit shows the latest 100 changes with document path, action, actor, changed fields, and before/after payloads.
+- Signed-in solo users are attributed by Firebase Auth UID/email. PIN-only admin changes are recorded as unauthenticated app-user changes until admin actions move behind Firebase Auth.
+
 ---
 
 ## Handicap math

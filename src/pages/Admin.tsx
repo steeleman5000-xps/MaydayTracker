@@ -7,7 +7,8 @@ import AdminMatchups from '../components/AdminMatchups';
 import AdminTrips from '../components/AdminTrips';
 import AdminItinerary from '../components/AdminItinerary';
 import AdminCourses from '../components/AdminCourses';
-import type { Player, Round, Matchup, AppConfig, Trip, TripEvent, SavedCourse } from '../types';
+import AdminAudit from '../components/AdminAudit';
+import type { Player, Round, Matchup, AppConfig, Trip, TripEvent, SavedCourse, AuditEvent } from '../types';
 import {
   subscribeConfig,
   subscribePlayers,
@@ -16,12 +17,13 @@ import {
   subscribeTrips,
   subscribeTripEvents,
   subscribeSavedCourses,
+  subscribeAuditEvents,
   saveConfig,
 } from '../lib/db';
 import { tripBackgroundUrl } from '../lib/tripAssets';
 import { useTripSelection } from '../lib/tripSelection';
 
-type Tab = 'setup' | 'trips' | 'players' | 'courses' | 'rounds' | 'matchups' | 'itinerary';
+type Tab = 'setup' | 'trips' | 'players' | 'courses' | 'rounds' | 'matchups' | 'itinerary' | 'audit';
 
 export default function Admin() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -31,6 +33,7 @@ export default function Admin() {
   const [savedCourses, setSavedCourses] = useState<SavedCourse[]>([]);
   const [matchups, setMatchups] = useState<Matchup[]>([]);
   const [events, setEvents] = useState<TripEvent[]>([]);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [tab, setTab] = useState<Tab>('setup');
   const [configForm, setConfigForm] = useState<AppConfig>({
     teamAName: 'USA',
@@ -52,6 +55,7 @@ export default function Admin() {
       subscribeSavedCourses(setSavedCourses),
       subscribeMatchups(setMatchups),
       subscribeTripEvents(setEvents),
+      subscribeAuditEvents(setAuditEvents),
     ];
     return () => unsubs.forEach((u) => u());
   }, []);
@@ -94,6 +98,7 @@ export default function Admin() {
     { id: 'rounds', label: `Rounds (${selectedRounds.length})` },
     { id: 'matchups', label: `Matchups (${selectedMatchups.length})` },
     { id: 'itinerary', label: `Itinerary (${selectedEvents.length})` },
+    { id: 'audit', label: `Audit (${auditEvents.length})` },
   ];
 
   return (
@@ -238,6 +243,10 @@ export default function Admin() {
 
         {tab === 'itinerary' && (
           <AdminItinerary tripId={selectedTripId} events={selectedEvents} />
+        )}
+
+        {tab === 'audit' && (
+          <AdminAudit events={auditEvents} />
         )}
       </Layout>
     </PinGate>
