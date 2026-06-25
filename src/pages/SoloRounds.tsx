@@ -76,9 +76,11 @@ export default function SoloRounds() {
   const [selectedSavedCourseId, setSelectedSavedCourseId] = useState('');
   const [selectedSavedTeeId, setSelectedSavedTeeId] = useState('');
   const [activeRoundId, setActiveRoundId] = useState<string | null>(null);
+  const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const [localScores, setLocalScores] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<'burn' | 'compliment'>('burn');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -123,9 +125,11 @@ export default function SoloRounds() {
   }, [player, soloRounds, user]);
 
   const activeRound = useMemo(() => {
-    const selectedRound = activeRoundId ? myRounds.find((round) => round.id === activeRoundId) : null;
+    const selectedRound = activeRoundId
+      ? myRounds.find((round) => round.id === activeRoundId && round.status !== 'complete')
+      : null;
     if (selectedRound) return selectedRound;
-    return myRounds.find((round) => round.status === 'active') ?? myRounds[0] ?? null;
+    return myRounds.find((round) => round.status === 'active') ?? null;
   }, [activeRoundId, myRounds]);
 
   const completedRoundEntries = useMemo<SoloRoundEntry[]>(() => {
@@ -293,9 +297,12 @@ export default function SoloRounds() {
       await updateSoloHoleScore(round.id, hole, score);
       const par = round.pars?.[hole - 1] ?? 4;
       if (score != null && score > par) {
-        const firstName = round.playerName.split(' ')[0] || 'You';
-        setToast(getSoloHoleComment(firstName, score, par));
+        setToastTone('burn');
+      } else if (score != null && score < par) {
+        setToastTone('compliment');
       }
+      const firstName = round.playerName.split(' ')[0] || 'You';
+      setToast(score == null ? null : getSoloHoleComment(firstName, score, par));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save score');
     } finally {
@@ -306,12 +313,16 @@ export default function SoloRounds() {
   async function markComplete(round: SoloRound) {
     setSaving(true);
     await updateSoloRound(round.id, { status: 'complete', updatedAt: Date.now() });
+    setActiveRoundId(null);
+    setExpandedRoundId(null);
     setSaving(false);
   }
 
   async function reopenRound(round: SoloRound) {
     setSaving(true);
     await updateSoloRound(round.id, { status: 'active', updatedAt: Date.now() });
+    setActiveRoundId(round.id);
+    setExpandedRoundId(null);
     setSaving(false);
   }
 
@@ -319,6 +330,7 @@ export default function SoloRounds() {
     if (!confirm(`Delete solo round at ${round.courseName}?`)) return;
     await deleteSoloRound(round.id);
     if (activeRoundId === round.id) setActiveRoundId(null);
+    if (expandedRoundId === round.id) setExpandedRoundId(null);
   }
 
   function applyApiTee(course: GolfCourseApiCourse, gender: 'male' | 'female', tee: GolfCourseTeeBox) {
@@ -813,9 +825,19 @@ export default function SoloRounds() {
                   <button
                     type="button"
                     className="btn-secondary text-sm"
-                    onClick={() => setActiveRoundId(round.id)}
+                    onClick={() => {
+                      if (round.status === 'complete') {
+                        setExpandedRoundId((current) => current === round.id ? null : round.id);
+                        setActiveRoundId(null);
+                      } else {
+                        setActiveRoundId(round.id);
+                        setExpandedRoundId(null);
+                      }
+                    }}
                   >
-                    {round.status === 'complete' ? 'View Card' : 'Resume'}
+                    {round.status === 'complete'
+                      ? expandedRoundId === round.id ? 'Hide Card' : 'View Card'
+                      : 'Resume'}
                   </button>
                   <button
                     type="button"
@@ -826,6 +848,11 @@ export default function SoloRounds() {
                     Delete
                   </button>
                 </div>
+                {expandedRoundId === round.id && (
+                  <div className="mt-4 border-t border-slate-700 pt-4">
+                    <SoloRoundCardTable round={round} />
+                  </div>
+                )}
               </article>
             );
           })}
@@ -874,8 +901,12 @@ export default function SoloRounds() {
           className="fixed bottom-4 left-3 right-3 z-50 cursor-pointer"
           onClick={() => setToast(null)}
         >
-          <div className="rounded-xl border-2 border-orange-500 bg-slate-900 p-4 shadow-2xl">
-            <div className="mb-2 text-center text-xs font-bold uppercase tracking-widest text-orange-400">
+          <div className={`rounded-xl border-2 bg-slate-900 p-4 shadow-2xl ${
+            toastTone === 'compliment' ? 'border-emerald-500' : 'border-orange-500'
+          }`}>
+            <div className={`mb-2 text-center text-xs font-bold uppercase tracking-widest ${
+              toastTone === 'compliment' ? 'text-emerald-400' : 'text-orange-400'
+            }`}>
               Solo Hole Report
             </div>
             <p className="text-center text-sm leading-snug text-white">{toast}</p>
@@ -1048,6 +1079,45 @@ function Metric({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-lg border border-slate-700 bg-slate-900/70 px-2 py-3">
       <div className="text-lg font-black text-white">{value}</div>
       <div className="text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function SoloRoundCardTable({ round }: { round: SoloRound }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[520px] text-sm">
+        <thead>
+          <tr className="text-xs text-slate-500">
+            <th className="py-1 text-left">Hole</th>
+            <th className="py-1 text-center">Par</th>
+            <th className="py-1 text-center">Yds</th>
+            <th className="py-1 text-center">HCP</th>
+            <th className="py-1 text-center">Score</th>
+            <th className="py-1 text-center">+/-</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: 18 }, (_, index) => {
+            const hole = index + 1;
+            const par = round.pars?.[index] ?? 4;
+            const score = round.scores?.[hole];
+            const diff = score != null ? score - par : null;
+            return (
+              <tr key={hole} className="border-t border-slate-700">
+                <td className="py-2 text-slate-400">{hole}</td>
+                <td className="py-2 text-center">{par}</td>
+                <td className="py-2 text-center text-slate-400">{round.yardages?.[index] ?? '-'}</td>
+                <td className="py-2 text-center text-slate-500">{round.strokeIndexes[index] ?? '-'}</td>
+                <td className="py-2 text-center font-bold text-white">{score ?? '-'}</td>
+                <td className={`py-2 text-center font-bold ${diff == null ? 'text-slate-600' : diff <= 0 ? 'text-emerald-400' : 'text-orange-400'}`}>
+                  {diff == null ? '-' : formatToPar(diff)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
