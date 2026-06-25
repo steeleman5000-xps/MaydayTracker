@@ -134,6 +134,28 @@ const SOLO_BLOWUP_LINES: Array<(player: string, overPar: number) => string> = [
   (p, over) => `${p} went ${over} over with the reckless precision of a Tiger Woods tabloid headline, except this crash only injured the scorecard.`,
 ];
 
+const SOLO_BIRDIE_LINES: Array<(player: string, underPar: number) => string> = [
+  (p) => `Birdie for ${p}. Incredible. The course briefly lost custody of its own dignity.`,
+  (p) => `${p} made birdie, which is suspicious behavior from someone usually negotiating with bogey like a hostage mediator.`,
+  (p) => `Birdie. ${p} accidentally played golf correctly and now everybody has to pretend this was the plan.`,
+  (p) => `${p} just circled one. Alert the clubhouse before he starts calling it a breakthrough.`,
+  (p) => `Birdie for ${p}. Enjoy the rare air before gravity and the next tee box file their paperwork.`,
+  (p) => `${p} made birdie with the confidence of a man who will absolutely mention it three drinks from now.`,
+  (p) => `Birdie. For one hole, ${p}'s swing and self-image were legally allowed in the same room.`,
+  (p) => `${p} just stole a stroke from the course. Nice work, Ocean's Eleven handicap edition.`,
+  (p) => `Birdie for ${p}. The scorecard is confused but willing to accept the donation.`,
+  (p) => `${p} went under par there. Somewhere, his group chat is already overpricing the achievement.`,
+];
+
+const SOLO_EAGLE_LINES: Array<(player: string, underPar: number) => string> = [
+  (p, under) => `${under} under for ${p}. That was almost too competent for the brand.`,
+  (p, under) => `${p} just went ${under} under on a hole. Frame the ball before normal service resumes.`,
+  (p, under) => `${under} under. ${p} briefly played like the golf gods left the keys in the cart.`,
+  (p, under) => `${p} made a ${under}-under number and now has enough material for one unbearable dinner story.`,
+  (p, under) => `${under} under for ${p}. The course got robbed and somehow still tipped its cap.`,
+  (p) => `${p} just did something athletic enough to make the rest of the round legally non-binding.`,
+];
+
 export function getHoleComment(
   winner: 'A' | 'B' | null,
   nameA: string,
@@ -149,7 +171,12 @@ export function getHoleComment(
 
 export function getSoloHoleComment(player: string, score: number, par: number): string | null {
   const overPar = score - par;
-  if (overPar <= 0) return null;
+  if (overPar === 0) return null;
+  if (overPar < 0) {
+    const underPar = Math.abs(overPar);
+    if (underPar === 1) return pick(SOLO_BIRDIE_LINES)(player, underPar);
+    return pick(SOLO_EAGLE_LINES)(player, underPar);
+  }
   if (overPar === 1) return pick(SOLO_BOGEY_LINES)(player);
   if (overPar === 2) return pick(SOLO_DOUBLE_LINES)(player);
   return pick(SOLO_BLOWUP_LINES)(player, overPar);
