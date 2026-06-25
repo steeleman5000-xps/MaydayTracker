@@ -5,6 +5,8 @@ import { subscribeConfig, subscribeRounds, subscribeTrips } from '../lib/db';
 import { DEFAULT_LOGO_URL, tripBackgroundUrl } from '../lib/tripAssets';
 import { useTripSelection } from '../lib/tripSelection';
 
+const PRINTFUL_STORE_URL = 'https://mayday-golf.printful.me';
+
 const PRODUCTS = [
   {
     name: 'Mayday Rope Hat',
@@ -70,8 +72,16 @@ export default function Merch() {
               <div className="text-xs font-black uppercase tracking-[0.28em] text-emerald-700">Mayday Pro Shop</div>
               <h1 className="mt-3 text-4xl font-black leading-tight sm:text-5xl">Wear the bad decisions.</h1>
               <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                A future merch hub for trip hats, polos, towels, and annual champion gear. For now, this is a polished product board you can use to decide what to order through Printful, Shopify, Custom Ink, or a local shop.
+                The Mayday pro shop is live through Printful. Grab hats, shirts, and trip gear before someone with a worse swing buys the same size and calls it leadership.
               </p>
+              <a
+                href={PRINTFUL_STORE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-primary mt-5 inline-flex"
+              >
+                Shop Mayday Gear
+              </a>
             </div>
             <div className="flex items-center justify-center rounded-xl bg-slate-100 p-5">
               <img src={DEFAULT_LOGO_URL} alt="Mayday Golf Classic" className="max-h-40 object-contain" />
@@ -91,17 +101,32 @@ export default function Merch() {
               </div>
               <div className="mt-4 flex items-center justify-between border-t border-slate-700 pt-3">
                 <span className="text-lg font-black text-emerald-300">{product.price}</span>
-                <span className="rounded-lg border border-slate-600 px-3 py-1 text-xs font-bold text-slate-300">Concept</span>
+                <a
+                  href={PRINTFUL_STORE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-emerald-700 px-3 py-1 text-xs font-bold text-emerald-200 hover:bg-emerald-950"
+                >
+                  Shop Store
+                </a>
               </div>
             </article>
           ))}
         </section>
 
         <section className="card">
-          <h2 className="text-lg font-bold">Next Commerce Step</h2>
+          <h2 className="text-lg font-bold">Official Storefront</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Best path: upload the transparent Mayday logo to a print-on-demand provider, create product links, then replace these concept cards with real checkout URLs. The app can stay the trip hub while orders are handled by a dedicated merch platform.
+            Orders, payment, fulfillment, and shipping are handled by Printful, so the Mayday app can stay focused on scores, standings, and humiliation.
           </p>
+          <a
+            href={PRINTFUL_STORE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary mt-4 inline-flex"
+          >
+            Open Printful Store
+          </a>
         </section>
       </div>
     </Layout>
