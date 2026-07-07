@@ -11,6 +11,7 @@ import PrintableScorecard from './pages/PrintableScorecard';
 import Merch from './pages/Merch';
 import Games from './pages/Games';
 import SoloRounds from './pages/SoloRounds';
+import TripIdeas from './pages/TripIdeas';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/solo" element={<SoloRounds />} />
         <Route path="/merch" element={<Merch />} />
         <Route path="/games" element={<Games />} />
+        <Route path="/trip-ideas" element={<TripIdeas />} />
         <Route path="/my-player" element={<MyPlayer />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/match/:matchupId" element={<MatchScoring />} />
