@@ -78,6 +78,7 @@ export default function Landing() {
               <Link to="/scores" className="btn-primary">Live Scores</Link>
               <Link to="/scorecards" className="btn-secondary">Print Scorecards</Link>
               <Link to="/itinerary" className="btn-secondary">Trip Itinerary</Link>
+              <Link to="/trip-ideas" className="btn-secondary">Trip Ideas</Link>
             </div>
           </div>
         </section>
@@ -98,6 +99,10 @@ export default function Landing() {
             <Link to="/admin" className="rounded-lg border border-slate-700 bg-slate-900 p-4 hover:border-emerald-600">
               <div className="text-sm font-bold text-emerald-300">Planner Tools</div>
               <p className="mt-1 text-sm text-slate-400">Rounds, matchups, scorecards, itinerary, teams, and captains.</p>
+            </Link>
+            <Link to="/trip-ideas" className="rounded-lg border border-slate-700 bg-slate-900 p-4 hover:border-emerald-600">
+              <div className="text-sm font-bold text-emerald-300">Trip Idea Finder</div>
+              <p className="mt-1 text-sm text-slate-400">Answer a few planning questions and compare course-and-lodging options.</p>
             </Link>
           </div>
         </section>

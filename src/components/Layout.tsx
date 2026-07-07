@@ -6,6 +6,7 @@ import type { Trip } from '../types';
 interface Props {
   children: React.ReactNode;
   backgroundUrl?: string;
+  contentWidth?: 'normal' | 'wide';
   trips?: Trip[];
   selectedTripId?: string;
   hasUnassignedRounds?: boolean;
@@ -15,6 +16,7 @@ interface Props {
 export default function Layout({
   children,
   backgroundUrl,
+  contentWidth = 'normal',
   trips = [],
   selectedTripId = '',
   hasUnassignedRounds = false,
@@ -22,6 +24,7 @@ export default function Layout({
 }: Props) {
   const { pathname } = useLocation();
   const showTripSelector = Boolean(onTripChange) && (trips.length > 0 || hasUnassignedRounds);
+  const mainWidthClass = contentWidth === 'wide' ? 'max-w-6xl' : 'max-w-2xl';
 
   return (
     <div
@@ -132,6 +135,16 @@ export default function Layout({
             Games
           </Link>
           <Link
+            to="/trip-ideas"
+            className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              pathname === '/trip-ideas'
+                ? 'bg-emerald-700 text-white'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
+            }`}
+          >
+            Ideas
+          </Link>
+          <Link
             to="/my-player"
             className={`px-2 sm:px-3 py-1 rounded-lg font-medium transition-colors whitespace-nowrap ${
               pathname === '/my-player'
@@ -154,7 +167,7 @@ export default function Layout({
         </div>
         </div>
       </header>
-      <main className="flex-1 p-4 max-w-2xl mx-auto w-full relative z-0">{children}</main>
+      <main className={`flex-1 p-4 ${mainWidthClass} mx-auto w-full relative z-0`}>{children}</main>
     </div>
   );
 }
