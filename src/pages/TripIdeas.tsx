@@ -1642,6 +1642,7 @@ export default function TripIdeas() {
 
 function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
   const month = Number(form.month);
+  const leadMonths = tripLeadMonths(form);
 
   return TRIP_IDEAS.map((idea) => {
     let score = 0;
@@ -1666,6 +1667,19 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
       score -= 9;
     }
 
+    if (leadMonths !== null) {
+      if (leadMonths < 0) {
+        score -= 24;
+      } else if (leadMonths < 4 && idea.teeTimeScarcity >= 4) {
+        score -= 14;
+      } else if (leadMonths >= 9 && idea.teeTimeScarcity >= 4) {
+        score += 8;
+        matchReasons.push('Advance planning helps unlock scarce tee times');
+      } else if (leadMonths >= 3) {
+        score += 2;
+      }
+    }
+
     const budgetGap = Math.abs(BUDGET_ORDER.indexOf(form.budget) - BUDGET_ORDER.indexOf(idea.budget));
     score += Math.max(0, 14 - budgetGap * 7);
     if (budgetGap === 0) {
@@ -1686,11 +1700,27 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
       matchReasons.push('Course cluster supports the round count');
     } else if (form.rounds < idea.minRounds) {
       score -= 5;
+    } else {
+      score -= 8;
+    }
+
+    const recommendedNights = recommendedNightCount(form.rounds, idea.airportDriveMinutes, idea.routeStyles.includes('road-trip'));
+    const nightGap = form.nights - recommendedNights;
+    if (nightGap >= 0) {
+      score += Math.max(2, 8 - Math.min(nightGap, 3) * 2);
+      matchReasons.push('Trip length fits the route');
+      if (form.nights >= 5 && idea.nonGolfAmenities.length >= 3) {
+        score += 4;
+      }
+    } else {
+      score -= Math.min(18, Math.abs(nightGap) * 6);
     }
 
     if (idea.strengths.includes(form.priority)) {
       score += 16;
       matchReasons.push(`${PRIORITY_LABELS[form.priority]} is a core strength`);
+    } else {
+      score -= 4;
     }
 
     if (form.discoveryMode === 'hidden') {
@@ -1723,6 +1753,8 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
       if (form.hiddenGemType !== 'flexible') {
         matchReasons.push(`${HIDDEN_GEM_LABELS[form.hiddenGemType]} angle matches`);
       }
+    } else {
+      score -= 8;
     }
 
     if (driveFits(form.driveTolerance, idea.airportDriveMinutes)) {
@@ -1732,16 +1764,31 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
       score -= form.driveTolerance === 'easy' ? 12 : 6;
     }
 
-    if (form.lodging === 'flexible' || idea.lodgingStyles.includes(form.lodging)) {
+    if (form.lodging === 'flexible') {
+      score += 2;
+    } else if (idea.lodgingStyles.includes(form.lodging)) {
+      score += 10;
+      matchReasons.push('Lodging preference fits');
+    } else {
+      score -= 8;
+    }
+
+    if (form.polish === 'either') {
+      score += 2;
+    } else if (form.polish === idea.polish) {
+      score += 9;
+      matchReasons.push('Polish level matches');
+    } else {
+      score -= 7;
+    }
+
+    if (form.routeStyle === 'either') {
+      score += 2;
+    } else if (idea.routeStyles.includes(form.routeStyle)) {
       score += 8;
-    }
-
-    if (form.polish === 'either' || form.polish === idea.polish) {
-      score += 7;
-    }
-
-    if (form.routeStyle === 'either' || idea.routeStyles.includes(form.routeStyle)) {
-      score += 6;
+      matchReasons.push('Trip shape matches');
+    } else {
+      score -= 10;
     }
 
     if (scarcityFits(form.scarcity, idea.teeTimeScarcity)) {
@@ -1750,22 +1797,43 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
       score -= 8;
     }
 
-    if (form.shortCourses === 'yes' && idea.shortCourses) {
-      score += 5;
-    } else if (form.shortCourses === 'no' && idea.shortCourses && idea.minRounds <= 2) {
-      score -= 3;
+    if (form.shortCourses === 'yes') {
+      if (idea.shortCourses) {
+        score += 7;
+        matchReasons.push('Short-course option available');
+      } else {
+        score -= 6;
+      }
+    } else if (form.shortCourses === 'no') {
+      if (idea.shortCourses) {
+        score -= 5;
+      } else {
+        score += 4;
+      }
     }
 
-    if (form.walkingPreference === 'either' || idea.walkingStyles.includes(form.walkingPreference)) {
-      score += 4;
+    if (form.walkingPreference === 'either') {
+      score += 1;
+    } else if (idea.walkingStyles.includes(form.walkingPreference)) {
+      score += 7;
+      matchReasons.push('Walking/cart preference fits');
+    } else {
+      score -= 7;
     }
 
-    if (form.amenity === 'flexible' || idea.nonGolfAmenities.includes(form.amenity)) {
-      score += 5;
+    if (form.amenity === 'flexible') {
+      score += 1;
+    } else if (idea.nonGolfAmenities.includes(form.amenity)) {
+      score += 13;
+      matchReasons.push('Non-golf hook matches');
+    } else {
+      score -= 12;
     }
 
     if (idea.groupStyles.includes(form.groupStyle)) {
-      score += 5;
+      score += 7;
+    } else {
+      score -= 5;
     }
 
     if (idea.sourceConfidence === 'verified') {
@@ -1795,6 +1863,24 @@ function scarcityFits(tolerance: ScarcityTolerance, scarcity: number) {
   if (tolerance === 'avoid') return scarcity <= 2;
   if (tolerance === 'some') return scarcity <= 4;
   return true;
+}
+
+function tripLeadMonths(form: TripIdeaForm) {
+  const year = Number(form.year);
+  const month = form.month ? Number(form.month) : 12;
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return null;
+  }
+  const now = new Date();
+  return (year - now.getFullYear()) * 12 + (month - 1) - now.getMonth();
+}
+
+function recommendedNightCount(rounds: number, airportDriveMinutes: number, isRoadTrip: boolean) {
+  let nights = Math.max(1, Math.ceil(rounds / 2));
+  if (rounds >= 5) nights += 1;
+  if (airportDriveMinutes > 150) nights += 1;
+  if (isRoadTrip) nights += 1;
+  return Math.min(10, nights);
 }
 
 function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: string) => void }) {
