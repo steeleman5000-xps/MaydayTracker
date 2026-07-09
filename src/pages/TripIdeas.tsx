@@ -16,7 +16,7 @@ type ShortCoursePreference = 'yes' | 'no' | 'flexible';
 type WalkCartPreference = 'walking' | 'cart' | 'either';
 type AmenityPreference = 'none' | 'nightlife' | 'casino' | 'beach' | 'outdoors' | 'history' | 'flexible';
 type SourceConfidence = 'verified' | 'hypothesis';
-type UsRegion = 'southeast' | 'midwest' | 'plains' | 'mountain-west' | 'west-coast';
+type UsRegion = 'northeast' | 'southeast' | 'midwest' | 'plains' | 'mountain-west' | 'southwest' | 'west-coast';
 type UsRegionPreference = 'any' | UsRegion;
 
 interface TripIdeaForm {
@@ -141,34 +141,122 @@ const DRIVE_LABELS: Record<DriveTolerance, string> = {
 
 const US_REGION_LABELS: Record<UsRegionPreference, string> = {
   any: 'Any US region',
+  northeast: 'Northeast',
   southeast: 'Southeast',
   midwest: 'Midwest / Great Lakes',
   plains: 'Great Plains',
   'mountain-west': 'Mountain West',
+  southwest: 'Southwest',
   'west-coast': 'West Coast',
 };
 
-const US_STATE_OPTIONS = [
+const US_STATE_OPTIONS: Array<[string, string]> = [
+  ['AK', 'Alaska'],
   ['AL', 'Alabama'],
+  ['AR', 'Arkansas'],
+  ['AZ', 'Arizona'],
   ['CA', 'California'],
+  ['CO', 'Colorado'],
+  ['CT', 'Connecticut'],
+  ['DE', 'Delaware'],
   ['FL', 'Florida'],
   ['GA', 'Georgia'],
+  ['HI', 'Hawaii'],
   ['IA', 'Iowa'],
   ['ID', 'Idaho'],
+  ['IL', 'Illinois'],
+  ['IN', 'Indiana'],
   ['KS', 'Kansas'],
+  ['KY', 'Kentucky'],
+  ['LA', 'Louisiana'],
+  ['MA', 'Massachusetts'],
+  ['MD', 'Maryland'],
+  ['ME', 'Maine'],
   ['MI', 'Michigan'],
   ['MN', 'Minnesota'],
+  ['MO', 'Missouri'],
   ['MS', 'Mississippi'],
+  ['MT', 'Montana'],
   ['NC', 'North Carolina'],
+  ['ND', 'North Dakota'],
   ['NE', 'Nebraska'],
+  ['NH', 'New Hampshire'],
+  ['NJ', 'New Jersey'],
   ['NM', 'New Mexico'],
+  ['NV', 'Nevada'],
+  ['NY', 'New York'],
+  ['OH', 'Ohio'],
+  ['OK', 'Oklahoma'],
   ['OR', 'Oregon'],
+  ['PA', 'Pennsylvania'],
+  ['RI', 'Rhode Island'],
   ['SC', 'South Carolina'],
+  ['SD', 'South Dakota'],
   ['TN', 'Tennessee'],
+  ['TX', 'Texas'],
+  ['UT', 'Utah'],
+  ['VA', 'Virginia'],
+  ['VT', 'Vermont'],
+  ['WA', 'Washington'],
+  ['WV', 'West Virginia'],
   ['WI', 'Wisconsin'],
-] as const;
+  ['WY', 'Wyoming'],
+];
 
 const STATE_LABELS = Object.fromEntries(US_STATE_OPTIONS) as Record<string, string>;
+
+const STATE_REGION_BY_CODE: Record<string, UsRegion> = {
+  AK: 'west-coast',
+  AL: 'southeast',
+  AR: 'southeast',
+  AZ: 'southwest',
+  CA: 'west-coast',
+  CO: 'mountain-west',
+  CT: 'northeast',
+  DE: 'southeast',
+  FL: 'southeast',
+  GA: 'southeast',
+  HI: 'west-coast',
+  IA: 'midwest',
+  ID: 'mountain-west',
+  IL: 'midwest',
+  IN: 'midwest',
+  KS: 'plains',
+  KY: 'southeast',
+  LA: 'southeast',
+  MA: 'northeast',
+  MD: 'southeast',
+  ME: 'northeast',
+  MI: 'midwest',
+  MN: 'midwest',
+  MO: 'midwest',
+  MS: 'southeast',
+  MT: 'mountain-west',
+  NC: 'southeast',
+  ND: 'plains',
+  NE: 'plains',
+  NH: 'northeast',
+  NJ: 'northeast',
+  NM: 'southwest',
+  NV: 'southwest',
+  NY: 'northeast',
+  OH: 'midwest',
+  OK: 'plains',
+  OR: 'west-coast',
+  PA: 'northeast',
+  RI: 'northeast',
+  SC: 'southeast',
+  SD: 'plains',
+  TN: 'southeast',
+  TX: 'plains',
+  UT: 'mountain-west',
+  VA: 'southeast',
+  VT: 'northeast',
+  WA: 'west-coast',
+  WI: 'midwest',
+  WV: 'southeast',
+  WY: 'mountain-west',
+};
 
 const TRIP_IDEAS: TripIdea[] = [
   {
@@ -1402,7 +1490,7 @@ const US_GEO_BY_TRIP_ID: Record<string, { states: string[]; regions: UsRegion[] 
   'gulf-shores-kiva': { states: ['AL'], regions: ['southeast'] },
   'southern-pines-ross': { states: ['NC'], regions: ['southeast'] },
   'cabot-citrus': { states: ['FL'], regions: ['southeast'] },
-  'new-mexico-desert': { states: ['NM'], regions: ['mountain-west'] },
+  'new-mexico-desert': { states: ['NM'], regions: ['southwest', 'mountain-west'] },
   'ventura-ojai': { states: ['CA'], regions: ['west-coast'] },
   'iowa-value-loop': { states: ['IA'], regions: ['midwest'] },
   'mississippi-coast': { states: ['MS'], regions: ['southeast'] },
@@ -1450,6 +1538,15 @@ export default function TripIdeas() {
       region: value,
       usRegion: value === 'international' ? 'any' : current.usRegion,
       selectedStates: value === 'international' ? [] : current.selectedStates,
+    }));
+  }
+
+  function handleUsRegionChange(value: UsRegionPreference) {
+    const availableStates = stateOptionsForRegion(value).map(([state]) => state);
+    setForm((current) => ({
+      ...current,
+      usRegion: value,
+      selectedStates: current.selectedStates.filter((state) => availableStates.includes(state)),
     }));
   }
 
@@ -1580,15 +1677,18 @@ export default function TripIdeas() {
                   value={form.usRegion}
                   options={[
                     ['any', US_REGION_LABELS.any],
+                    ['northeast', US_REGION_LABELS.northeast],
                     ['southeast', US_REGION_LABELS.southeast],
                     ['midwest', US_REGION_LABELS.midwest],
                     ['plains', US_REGION_LABELS.plains],
                     ['mountain-west', US_REGION_LABELS['mountain-west']],
+                    ['southwest', US_REGION_LABELS.southwest],
                     ['west-coast', US_REGION_LABELS['west-coast']],
                   ]}
-                  onChange={(value) => updateForm('usRegion', value as UsRegionPreference)}
+                  onChange={(value) => handleUsRegionChange(value as UsRegionPreference)}
                 />
                 <StateSelector
+                  stateOptions={stateOptionsForRegion(form.usRegion)}
                   selectedStates={form.selectedStates}
                   onToggle={toggleState}
                   onClear={() => updateForm('selectedStates', [])}
@@ -2017,6 +2117,11 @@ function tripAreaSummary(form: TripIdeaForm) {
   return form.region === 'either' ? 'Any geography' : 'Any US area';
 }
 
+function stateOptionsForRegion(region: UsRegionPreference) {
+  if (region === 'any') return US_STATE_OPTIONS;
+  return US_STATE_OPTIONS.filter(([state]) => STATE_REGION_BY_CODE[state] === region);
+}
+
 function tripLeadMonths(form: TripIdeaForm) {
   const year = Number(form.year);
   const month = form.month ? Number(form.month) : 12;
@@ -2113,10 +2218,12 @@ function SelectField({
 }
 
 function StateSelector({
+  stateOptions,
   selectedStates,
   onToggle,
   onClear,
 }: {
+  stateOptions: Array<[string, string]>;
   selectedStates: string[];
   onToggle: (state: string) => void;
   onClear: () => void;
@@ -2136,7 +2243,7 @@ function StateSelector({
         )}
       </div>
       <div className="grid grid-cols-3 gap-2">
-        {US_STATE_OPTIONS.map(([state, label]) => {
+        {stateOptions.map(([state, label]) => {
           const selected = selectedStates.includes(state);
           return (
             <label
