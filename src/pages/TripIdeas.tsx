@@ -16,6 +16,8 @@ type ShortCoursePreference = 'yes' | 'no' | 'flexible';
 type WalkCartPreference = 'walking' | 'cart' | 'either';
 type AmenityPreference = 'none' | 'nightlife' | 'casino' | 'beach' | 'outdoors' | 'history' | 'flexible';
 type SourceConfidence = 'verified' | 'hypothesis';
+type UsRegion = 'southeast' | 'midwest' | 'plains' | 'mountain-west' | 'west-coast';
+type UsRegionPreference = 'any' | UsRegion;
 
 interface TripIdeaForm {
   groupSize: number;
@@ -25,6 +27,8 @@ interface TripIdeaForm {
   year: string;
   budget: BudgetRange;
   region: RegionPreference;
+  usRegion: UsRegionPreference;
+  selectedStates: string[];
   priority: TripPriority;
   lodging: LodgingPreference;
   groupStyle: GroupStyle;
@@ -134,6 +138,37 @@ const DRIVE_LABELS: Record<DriveTolerance, string> = {
   moderate: 'Up to 2.5 hours',
   remote: 'Remote is fine',
 };
+
+const US_REGION_LABELS: Record<UsRegionPreference, string> = {
+  any: 'Any US region',
+  southeast: 'Southeast',
+  midwest: 'Midwest / Great Lakes',
+  plains: 'Great Plains',
+  'mountain-west': 'Mountain West',
+  'west-coast': 'West Coast',
+};
+
+const US_STATE_OPTIONS = [
+  ['AL', 'Alabama'],
+  ['CA', 'California'],
+  ['FL', 'Florida'],
+  ['GA', 'Georgia'],
+  ['IA', 'Iowa'],
+  ['ID', 'Idaho'],
+  ['KS', 'Kansas'],
+  ['MI', 'Michigan'],
+  ['MN', 'Minnesota'],
+  ['MS', 'Mississippi'],
+  ['NC', 'North Carolina'],
+  ['NE', 'Nebraska'],
+  ['NM', 'New Mexico'],
+  ['OR', 'Oregon'],
+  ['SC', 'South Carolina'],
+  ['TN', 'Tennessee'],
+  ['WI', 'Wisconsin'],
+] as const;
+
+const STATE_LABELS = Object.fromEntries(US_STATE_OPTIONS) as Record<string, string>;
 
 const TRIP_IDEAS: TripIdea[] = [
   {
@@ -1347,6 +1382,33 @@ const TRIP_IDEAS: TripIdea[] = [
   },
 ];
 
+const US_GEO_BY_TRIP_ID: Record<string, { states: string[]; regions: UsRegion[] }> = {
+  pinehurst: { states: ['NC'], regions: ['southeast'] },
+  bandon: { states: ['OR'], regions: ['west-coast'] },
+  streamsong: { states: ['FL'], regions: ['southeast'] },
+  kohler: { states: ['WI'], regions: ['midwest'] },
+  'myrtle-legends': { states: ['SC'], regions: ['southeast'] },
+  'rtj-alabama': { states: ['AL'], regions: ['southeast'] },
+  'sweetens-chattanooga': { states: ['TN'], regions: ['southeast'] },
+  'landmand-sioux-city': { states: ['NE', 'IA'], regions: ['plains', 'midwest'] },
+  'wildhorse-gothenburg': { states: ['NE'], regions: ['plains'] },
+  'firekeeper-flint-hills': { states: ['KS'], regions: ['plains'] },
+  'circling-raven-idaho': { states: ['ID'], regions: ['mountain-west'] },
+  'giants-ridge-iron-range': { states: ['MN'], regions: ['midwest'] },
+  'upper-peninsula-michigan': { states: ['MI'], regions: ['midwest'] },
+  'lawsonia-green-lake': { states: ['WI'], regions: ['midwest'] },
+  'augusta-patch': { states: ['GA'], regions: ['southeast'] },
+  'west-palm-muni': { states: ['FL'], regions: ['southeast'] },
+  'gulf-shores-kiva': { states: ['AL'], regions: ['southeast'] },
+  'southern-pines-ross': { states: ['NC'], regions: ['southeast'] },
+  'cabot-citrus': { states: ['FL'], regions: ['southeast'] },
+  'new-mexico-desert': { states: ['NM'], regions: ['mountain-west'] },
+  'ventura-ojai': { states: ['CA'], regions: ['west-coast'] },
+  'iowa-value-loop': { states: ['IA'], regions: ['midwest'] },
+  'mississippi-coast': { states: ['MS'], regions: ['southeast'] },
+  'silvies-oregon': { states: ['OR'], regions: ['west-coast'] },
+};
+
 const DEFAULT_FORM: TripIdeaForm = {
   groupSize: 8,
   rounds: 4,
@@ -1355,6 +1417,8 @@ const DEFAULT_FORM: TripIdeaForm = {
   year: String(new Date().getFullYear() + 1),
   budget: 'standard',
   region: 'us',
+  usRegion: 'any',
+  selectedStates: [],
   priority: 'hidden-gems',
   lodging: 'flexible',
   groupStyle: 'mixed',
@@ -1378,6 +1442,24 @@ export default function TripIdeas() {
 
   function updateForm<K extends keyof TripIdeaForm>(field: K, value: TripIdeaForm[K]) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function handleRegionPreferenceChange(value: RegionPreference) {
+    setForm((current) => ({
+      ...current,
+      region: value,
+      usRegion: value === 'international' ? 'any' : current.usRegion,
+      selectedStates: value === 'international' ? [] : current.selectedStates,
+    }));
+  }
+
+  function toggleState(state: string) {
+    setForm((current) => ({
+      ...current,
+      selectedStates: current.selectedStates.includes(state)
+        ? current.selectedStates.filter((selectedState) => selectedState !== state)
+        : [...current.selectedStates, state],
+    }));
   }
 
   function handleNumberChange(field: 'groupSize' | 'rounds' | 'nights', value: string) {
@@ -1414,7 +1496,7 @@ export default function TripIdeas() {
                 <SummaryStat label="Group" value={`${form.groupSize} players`} />
                 <SummaryStat label="Golf" value={`${form.rounds} rounds`} />
                 <SummaryStat label="Discovery" value={form.discoveryMode === 'hidden' ? 'Hidden first' : form.discoveryMode === 'balanced' ? 'Balanced' : 'Known anchors'} />
-                <SummaryStat label="Drive" value={DRIVE_LABELS[form.driveTolerance]} />
+                <SummaryStat label="Area" value={tripAreaSummary(form)} />
               </div>
             </div>
           </div>
@@ -1488,8 +1570,31 @@ export default function TripIdeas() {
                 ['international', 'International'],
                 ['either', 'Either'],
               ]}
-              onChange={(value) => updateForm('region', value as RegionPreference)}
+              onChange={(value) => handleRegionPreferenceChange(value as RegionPreference)}
             />
+
+            {form.region !== 'international' && (
+              <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-900 p-3">
+                <SelectField
+                  label="US region"
+                  value={form.usRegion}
+                  options={[
+                    ['any', US_REGION_LABELS.any],
+                    ['southeast', US_REGION_LABELS.southeast],
+                    ['midwest', US_REGION_LABELS.midwest],
+                    ['plains', US_REGION_LABELS.plains],
+                    ['mountain-west', US_REGION_LABELS['mountain-west']],
+                    ['west-coast', US_REGION_LABELS['west-coast']],
+                  ]}
+                  onChange={(value) => updateForm('usRegion', value as UsRegionPreference)}
+                />
+                <StateSelector
+                  selectedStates={form.selectedStates}
+                  onToggle={toggleState}
+                  onClear={() => updateForm('selectedStates', [])}
+                />
+              </div>
+            )}
 
             <div>
               <label className="label">Main decision driver</label>
@@ -1647,6 +1752,7 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
   return TRIP_IDEAS.map((idea) => {
     let score = 0;
     const matchReasons: string[] = [];
+    const usGeo = usGeoForTrip(idea);
     const viabilityScore = idea.publicAccessQuality + idea.lodgingCapacityScore + idea.groupLogisticsScore + Math.min(5, idea.courseClusterCount);
     const differentiationScore = (6 - idea.mainstreamSaturationScore) + idea.grassrootsSignalScore;
 
@@ -1655,6 +1761,28 @@ function rankTripIdeas(form: TripIdeaForm): RankedTripIdea[] {
       matchReasons.push(form.region === 'either' ? 'Fits either geography' : `Matches ${form.region === 'us' ? 'US' : 'international'} preference`);
     } else {
       score -= 22;
+    }
+
+    if (form.region !== 'international' && form.usRegion !== 'any') {
+      if (idea.region === 'us' && usGeo?.regions.includes(form.usRegion)) {
+        score += 15;
+        matchReasons.push(`${US_REGION_LABELS[form.usRegion]} match`);
+      } else if (idea.region === 'us') {
+        score -= 16;
+      } else {
+        score -= 10;
+      }
+    }
+
+    if (form.region !== 'international' && form.selectedStates.length > 0) {
+      if (idea.region === 'us' && usGeo && hasStateOverlap(usGeo.states, form.selectedStates)) {
+        score += 24;
+        matchReasons.push(`${stateListLabel(form.selectedStates)} state fit`);
+      } else if (idea.region === 'us') {
+        score -= 28;
+      } else {
+        score -= 18;
+      }
     }
 
     if (!form.month) {
@@ -1865,6 +1993,30 @@ function scarcityFits(tolerance: ScarcityTolerance, scarcity: number) {
   return true;
 }
 
+function usGeoForTrip(idea: TripIdea) {
+  return idea.region === 'us' ? US_GEO_BY_TRIP_ID[idea.id] : undefined;
+}
+
+function hasStateOverlap(tripStates: string[], selectedStates: string[]) {
+  return selectedStates.some((state) => tripStates.includes(state));
+}
+
+function stateListLabel(states: string[]) {
+  if (states.length === 0) return 'Any state';
+  if (states.length === 1) return STATE_LABELS[states[0]] ?? states[0];
+  if (states.length === 2) {
+    return states.map((state) => STATE_LABELS[state] ?? state).join(' / ');
+  }
+  return `${states.length} selected states`;
+}
+
+function tripAreaSummary(form: TripIdeaForm) {
+  if (form.region === 'international') return 'International';
+  if (form.selectedStates.length > 0) return stateListLabel(form.selectedStates);
+  if (form.usRegion !== 'any') return US_REGION_LABELS[form.usRegion];
+  return form.region === 'either' ? 'Any geography' : 'Any US area';
+}
+
 function tripLeadMonths(form: TripIdeaForm) {
   const year = Number(form.year);
   const month = form.month ? Number(form.month) : 12;
@@ -1957,6 +2109,60 @@ function SelectField({
         ))}
       </select>
     </div>
+  );
+}
+
+function StateSelector({
+  selectedStates,
+  onToggle,
+  onClear,
+}: {
+  selectedStates: string[];
+  onToggle: (state: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <fieldset>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <legend className="label mb-0">State(s)</legend>
+        {selectedStates.length > 0 && (
+          <button
+            type="button"
+            className="text-xs font-bold text-emerald-300 hover:text-emerald-200"
+            onClick={onClear}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {US_STATE_OPTIONS.map(([state, label]) => {
+          const selected = selectedStates.includes(state);
+          return (
+            <label
+              key={state}
+              className={`flex cursor-pointer items-center justify-center rounded-lg border px-2 py-2 text-xs font-black transition-colors ${
+                selected
+                  ? 'border-emerald-500 bg-emerald-950 text-white'
+                  : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500'
+              }`}
+              title={label}
+            >
+              <span>{state}</span>
+              <input
+                className="sr-only"
+                type="checkbox"
+                checked={selected}
+                onChange={() => onToggle(state)}
+              />
+            </label>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        Leave empty for any state. Pick multiple states for flexible regional planning.
+      </p>
+    </fieldset>
   );
 }
 
