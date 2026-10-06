@@ -11,7 +11,7 @@
     "typecheck": "tsc -b",
     "build": "tsc -b && vite build",
     "lint": "npm run typecheck",
-    "test": "node scripts/test-scoring.mjs",
+    "test": "node scripts/test-scoring.mjs && node scripts/test-golf-courses.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

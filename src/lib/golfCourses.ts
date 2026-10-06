@@ -1,14 +1,14 @@
-import type { GolfCourseApiCourse } from '../types';
+import type { GolfCourseApiCourse, GolfCourseApiSummary } from '../types';
 
-export async function searchGolfCourses(query: string): Promise<GolfCourseApiCourse[]> {
+export async function searchGolfCourses(query: string): Promise<GolfCourseApiSummary[]> {
   const response = await fetch(`/api/golf-courses/search?q=${encodeURIComponent(query)}`);
   if (!response.ok) throw new Error(await readApiError(response));
-  const data = await response.json() as { courses?: GolfCourseApiCourse[] };
+  const data = await response.json() as { courses?: GolfCourseApiSummary[] };
   return data.courses ?? [];
 }
 
-export async function getGolfCourse(courseId: number): Promise<GolfCourseApiCourse> {
-  const response = await fetch(`/api/golf-courses/${courseId}`);
+export async function getGolfCourse(courseId: string): Promise<GolfCourseApiCourse> {
+  const response = await fetch(`/api/golf-courses/${encodeURIComponent(courseId)}`);
   if (!response.ok) throw new Error(await readApiError(response));
   const data = await response.json() as GolfCourseApiCourse | { course?: GolfCourseApiCourse };
   if ('course' in data && data.course) return data.course;

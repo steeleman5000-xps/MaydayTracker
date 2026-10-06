@@ -27,9 +27,12 @@ export async function onRequestGet({ env, params }: PagesContext) {
   }
 
   const id = params.id;
-  if (!id || !/^\d+$/.test(id)) return json({ error: 'Course id is required.' }, { status: 400 });
+  // GolfCourseAPI uses opaque, case-insensitive eight-character IDs.
+  if (!id || !/^[0-9abcdefghjkmnpqrstvwxyz]{8}$/i.test(id)) {
+    return json({ error: 'A valid course id is required.' }, { status: 400 });
+  }
 
-  const response = await fetch(`${API_BASE}/v1/courses/${id}`, {
+  const response = await fetch(`${API_BASE}/v1/courses/${encodeURIComponent(id.toLowerCase())}`, {
     headers: { Authorization: `Key ${env.GOLFCOURSE_API_KEY}` },
   });
 
