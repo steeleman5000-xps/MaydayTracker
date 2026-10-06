@@ -4,6 +4,7 @@ import type { User } from 'firebase/auth';
 import Layout from '../components/Layout';
 import type {
   GolfCourseApiCourse,
+  GolfCourseApiSummary,
   GolfCourseTeeBox,
   Player,
   SavedCourse,
@@ -68,7 +69,7 @@ export default function SoloRounds() {
   const [loaded, setLoaded] = useState({ auth: false, players: false, courses: false, rounds: false });
   const [draft, setDraft] = useState<SoloRoundDraft>(() => blankDraft());
   const [courseQuery, setCourseQuery] = useState('');
-  const [courseResults, setCourseResults] = useState<GolfCourseApiCourse[]>([]);
+  const [courseResults, setCourseResults] = useState<GolfCourseApiSummary[]>([]);
   const [courseLoading, setCourseLoading] = useState(false);
   const [courseError, setCourseError] = useState<string | null>(null);
   const [selectedApiCourse, setSelectedApiCourse] = useState<GolfCourseApiCourse | null>(null);
@@ -204,7 +205,7 @@ export default function SoloRounds() {
     }
   }
 
-  async function selectApiCourse(course: GolfCourseApiCourse) {
+  async function selectApiCourse(course: GolfCourseApiSummary) {
     setCourseLoading(true);
     setCourseError(null);
     try {
@@ -940,7 +941,7 @@ function getApiTeeOptions(course: GolfCourseApiCourse): Array<{
   return options;
 }
 
-function formatApiCourseName(course: GolfCourseApiCourse): string {
+function formatApiCourseName(course: Pick<GolfCourseApiCourse, 'club_name' | 'course_name'>): string {
   if (course.course_name && course.course_name !== course.club_name) {
     return `${course.club_name} - ${course.course_name}`;
   }

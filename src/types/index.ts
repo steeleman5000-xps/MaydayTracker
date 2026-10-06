@@ -32,7 +32,7 @@ export interface Round {
   tripId?: string;
   number: number;
   courseName: string;
-  courseApiId?: number;
+  courseApiId?: string | number;
   savedCourseId?: string;
   courseClubName?: string;
   teeName?: string;
@@ -65,7 +65,7 @@ export interface GolfCourseTeeBox {
 }
 
 export interface GolfCourseApiCourse {
-  id: number;
+  id: string;
   club_name: string;
   course_name: string;
   location?: {
@@ -81,6 +81,11 @@ export interface GolfCourseApiCourse {
     female?: GolfCourseTeeBox[];
   };
 }
+
+// Search results contain tee counts; only course details contain tee arrays.
+export type GolfCourseApiSummary = Omit<GolfCourseApiCourse, 'tees'> & {
+  tees?: { male?: number; female?: number };
+};
 
 export interface SavedCourseTeeBox {
   id: string;
@@ -120,7 +125,7 @@ export interface SoloRound {
   playerName: string;
   playedAt: string;
   courseName: string;
-  courseApiId?: number;
+  courseApiId?: string | number;
   savedCourseId?: string;
   courseClubName?: string;
   teeName?: string;

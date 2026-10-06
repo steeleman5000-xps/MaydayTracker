@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { GolfCourseApiCourse, GolfCourseTeeBox, Round, SavedCourse, SavedCourseTeeBox, Trip } from '../types';
+import type { GolfCourseApiCourse, GolfCourseApiSummary, GolfCourseTeeBox, Round, SavedCourse, SavedCourseTeeBox, Trip } from '../types';
 import { saveRound, updateRound, deleteRound } from '../lib/db';
 import { getGolfCourse, searchGolfCourses } from '../lib/golfCourses';
 
@@ -20,7 +20,7 @@ export default function AdminRounds({ rounds, trips, selectedTripId, savedCourse
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editState, setEditState] = useState<RoundForm | null>(null);
   const [courseQuery, setCourseQuery] = useState('');
-  const [courseResults, setCourseResults] = useState<GolfCourseApiCourse[]>([]);
+  const [courseResults, setCourseResults] = useState<GolfCourseApiSummary[]>([]);
   const [courseError, setCourseError] = useState<string | null>(null);
   const [courseLoading, setCourseLoading] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<GolfCourseApiCourse | null>(null);
@@ -113,7 +113,7 @@ export default function AdminRounds({ rounds, trips, selectedTripId, savedCourse
     }
   }
 
-  async function handleSelectCourse(course: GolfCourseApiCourse) {
+  async function handleSelectCourse(course: GolfCourseApiSummary) {
     setCourseLoading(true);
     setCourseError(null);
     try {
